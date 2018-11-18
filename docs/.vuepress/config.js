@@ -27,7 +27,7 @@ module.exports = {
             "js/base",
             "react/base",
             "vue/base",
-            
+            "vuepress/base",
           ]
         }
       ],
