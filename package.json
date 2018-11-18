@@ -1,0 +1,14 @@
+{
+  "name": "",
+  "version": "",
+  "scripts": {
+    "dev": "vuepress dev docs",
+    "build": "vuepress build docs",
+    "deploy":"bash deploy.sh"
+ },
+  "dependencies": {
+    "node-sass": "^4.9.4",
+    "sass-loader": "^7.1.0",
+    "vuepress": "^0.14.4"
+  }
+}
