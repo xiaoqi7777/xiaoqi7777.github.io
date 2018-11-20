@@ -6,7 +6,7 @@
 
 ## 阅读
 
-[在线阅读](https://vanoneang.xiaoqi7777.io/)
+[在线阅读](https://xiaoqi7777.github.io/)
 
 ## vuepress
 
