@@ -37,6 +37,7 @@ module.exports = {
           collapsable: false,
           children: [ 
             "node/base",
+            "http/base",
           ]
         }
       ]
