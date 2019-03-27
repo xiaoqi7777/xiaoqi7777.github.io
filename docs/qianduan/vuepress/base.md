@@ -80,6 +80,7 @@ This is a dangerous thing
 
 加图片:
 ```
+assets 是public 下面的目录
 <img :src="$withBase('/assets/gitflow.png')" >
 ```
 
@@ -118,3 +119,5 @@ This is a dangerous thing
 lastUpdated  取的是执行git的时间
 
 2、发布上线尽量别用vscode再带的终端  用git(vscode 发布上线可能有点问题)
+
+3、新版vuepress npm install webpack-dev-middleware@3.6.0 要先运行这个

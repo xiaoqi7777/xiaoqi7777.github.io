@@ -14,6 +14,10 @@ module.exports = {
         link: "/houduan/"
       },
       {
+        text: "运维",
+        link: "/operation/"
+      },
+      {
         text: "GitHub",
         link: "https://github.com/xiaoqi7777"
       }
@@ -38,6 +42,18 @@ module.exports = {
           children: [ 
             "node/base",
             "http/base",
+          ]
+        }
+      ],
+      "/operation/":[
+        {
+          title: "运维",
+          collapsable: false,
+          children: [
+            "git",
+            "nginx",
+            "linux",
+            "docker"
           ]
         }
       ]
