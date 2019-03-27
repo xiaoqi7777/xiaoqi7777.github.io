@@ -494,3 +494,53 @@ data(){
   </template>
 
 ```
+
+## router
+
+```javascript
+
+  路由配置
+  import Home from './components.home.vue'
+  import Page from './components.page.vue'
+  import PageTwo from './components.pageTwo.vue'
+  routes:[
+    {
+      path:'/',
+      component:Home
+    },
+    { 
+      path:'/home',
+      name:'home',
+      component:Home,
+    },{
+      path:'/page',
+      name:'page',
+      component:Page,
+      children:[
+        path:'/pageTwo/:id',
+        name:'pageTwo',
+        component:PageTwo,
+      ]
+    }
+  ]
+
+  渲染(默认显示 path:'/')
+    <div>
+      <router-view></router-view>
+    </div>
+
+  跳转 通过标签 (123 对应/pageTwo: 后面的id)
+    <router-link to='/page/pageTwo/123'>路由跳转<router-link>
+    参数获取 this.$route.params.id 
+
+  跳转 通过JS
+    // 字符串
+    this.$router.push('/page/pageTwo')
+
+    // 对象
+    this.$router.push({path:'/page/pageTwo/123?a=1&b=2'})
+
+    // 命名路由
+    this.$router.push({name:'page',params:{id:123}})
+
+```

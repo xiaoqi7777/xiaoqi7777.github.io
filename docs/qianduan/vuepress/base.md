@@ -113,5 +113,8 @@ This is a dangerous thing
 ```
 
 记坑: 
-配置的lastUpdated  显示更新时间  必须要用git命令执行
+1、配置的lastUpdated  显示更新时间  必须要用git命令执行
+
 lastUpdated  取的是执行git的时间
+
+2、发布上线尽量别用vscode再带的终端  用git(vscode 发布上线可能有点问题)
