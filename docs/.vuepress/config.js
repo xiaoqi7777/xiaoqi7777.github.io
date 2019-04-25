@@ -18,6 +18,10 @@ module.exports = {
         link: "/operation/"
       },
       {
+        text: "内功",
+        link: "/foundation/"
+      },
+      {
         text: "GitHub",
         link: "https://github.com/xiaoqi7777"
       }
@@ -28,10 +32,12 @@ module.exports = {
           title: '前端基础汇总',
           collapsable: false,
           children: [ 
-            "js/base",
-            "react/base",
-            "vue/base",
-            "vuepress/base",
+            "js",
+            "react",
+            "vue",
+            "vuepress",
+            "phone",
+            "webpack"
           ]
         }
       ],
@@ -40,8 +46,11 @@ module.exports = {
           title: "后端基础汇总",
           collapsable: false,
           children: [ 
-            "node/base",
-            "http/base",
+            "node",
+            "ios",
+            "mongodb",
+            "egg",
+            "mock"
           ]
         }
       ],
@@ -54,6 +63,16 @@ module.exports = {
             "nginx",
             "linux",
             "docker"
+          ]
+        }
+      ],
+      "/foundation/":[
+        {
+          title: "内功",
+          collapsable: false,
+          children: [
+            "design",
+            "algorithm"
           ]
         }
       ]

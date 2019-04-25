@@ -27,6 +27,54 @@
     fs.write(fdr,buf,0,bufLength,null,(err,data)=>{}) //参数同上
     fs.close(fdr)
 ```
+
+**6、fs读/写**
+```js
+//  异步读取
+fs.readFile(path[, options], callback)
+/*
+  options
+    encoding
+    flag flag 默认 = 'r'
+  fs.readFile('1.js','utf8',(err,item)=>{
+    console.log('item',item)
+  })
+*/
+// 同步读取
+fs.readFileSync(path[, options])
+// 异步写入
+fs.writeFile(file, data[, options], callback)
+/*
+  options
+    encoding
+    flag flag 默认 = 'w'
+    mode 读写权限，默认为0666
+
+  let fs = require('fs');
+  fs.writeFile('./1.txt',Date.now()+'\n',{flag:'a'},function(){
+    console.log('ok');
+  });
+*/
+// 同步写入
+fs.writeFileSync(file, data[, options])
+// 追加文件
+fs.appendFile(file, data[, options], callback)
+/*
+  fs.appendFile('./1.txt',Date.now()+'\n',function(){
+    console.log('ok');
+  })
+*/
+// 拷贝文件
+function copy(src,target){
+  fs.readFile(src,function(err,data){
+    fs.writeFile(target,data);
+  })
+}
+
+```
+
+
+
 ## path
 
 **1、__dirname表示的是当前的文件所在的文件夹**
@@ -44,6 +92,13 @@
 **4、path.extname(1123.js)               输出.js(找后缀)**
 
 **5、path.basename('1.min.js','.js')     输出1.min(通过后缀 找文件路径)**
+
+**6、path.relative 从绝对路径里面找相对路径**
+```js
+// 当前在c:/index/a/b/c 知道c:/index  获取/a/b/c
+let c = path.relative(c:/index,c:/index/a/b/c)
+// c == a/b/c  主要a前面没有/
+```
 
 
 ## process
