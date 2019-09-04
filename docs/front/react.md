@@ -67,6 +67,8 @@
     console.log(this.content)
 ```
 ## 生命周期
+<img :src="$withBase('/img/reactCycle.png')" >
+[blog](https://www.cnblogs.com/qiaojie/p/6135180.html)
 ```js
 开始阶段
   componentWillMount 组件将要渲染
@@ -223,7 +225,10 @@ class My{
 ```
 ## 路由
 - 分hash #和 history h5api (刷新的时候页面不存在,一定会出现404的问题)
+- h5api 就是 history.pushState('xx',null,'./a')
+- history 只能通过popstate监听浏览器的前进和后退
 - npm install react-router-dom
+- BrowserRouter 和 HashRouter两种
 ```js
   import {HashRouter as Router,Route,Switch,Redirect,Link,NavLink} from 'react-router-dom'
   基本用法
@@ -266,13 +271,13 @@ class My{
   
 ```
 ## render component children区别
-- render和children 都是返回函数 component给一个组件
+- render和children 都是一个函数 他返回的结果被进行渲染  component返回一个组件
 - children 不管路径没有没匹配到 都会渲染 如果是当前路径 则props.match 为ture	
   - 一般对NavLink做 二次处理 如果跳转的是当前 可以把active放到上级
-- render 就是返回函数 
+- render 返回的是一个组件(函数) 
   - 一般对Route 进行二次处理 如果登陆就正常返回 否则 拦截等操作
 
-## react-redux用法
+## react-redux用法 && 原理
 - 创建一个store
 - actions 存放动作 => 导出的是一个对象 对象里面有操作的方法 方法返回对象  获得的对象传入reducers的第二个参数
 - reducers 存放管理员 => 就是一个函数接受(state,aciton) 返回一个对象 修改store的数据
@@ -280,6 +285,168 @@ class My{
 - types.js 存放操作类型 操作的类型 避免写错 所以集中存放
   - redux 在创建的store的时候 将reducer(管理员放进去) 默认是执行一次dispatch state会接受默认值
   - 在组件内是通过调用store.dispatch 修改state里面的东西 store.getState获取state里面的值
+
+- react-redux用法
+- 入口文件引入store
+```js
+/**   
+ * react-redux 在父级提供store 这样在每个组件中就不用引入store
+ * 提供了 connnect和Provider方法
+ */
+import { Provider } from "react-redux";
+import store from "./store";
+ReactDom.render(
+  <Provider store={store}>
+  <>
+    <Counter />
+  </>
+  </Provider>,
+  window.root
+);
+```
+- 下面的文件 引入connect
+- connect 连接有两种写法
+```js
+import actions from '../store/actions/Counter'
+// import {bindActionCreators} from 'redux';
+import {connect} from 'react-redux'
+
+class Counter extends Component {
+  state = {
+    number: ''
+  };
+  render() {
+    console.log(this.props)
+    return (
+      <>
+        <p>{this.props.number}</p>
+        <div onClick={() => this.props.del(3)}>点击减少</div>
+        <div onClick={() => this.props.add(3)}>点击增加</div>
+      </>
+    );
+  }
+}
+//connect 方法执行2次后 返回的是一个组件
+//第二个参数是原来的组件 会把redux中的状态映射到这个组件上
+// 11 、connect 第一个参数
+// let mapStateToProps = (state) => { //store.state
+//   console.log('state',state)
+//   return {
+//     number : state.counter.number
+//   }
+// }
+// 12、 简化1的写法
+let mapStateToProps = (state) => ({...state.counter})
+// 21 、connect 第二个参数
+let mapDispatchToProps = (dispatch) => { //store.dispatch
+  return{
+    // store.dispatch({ type: "ADD", count: 3 })
+    add:(num)=>dispatch(actions.add(3)),
+    del:(num)=>dispatch(actions.del(3))
+  }
+}
+export default connect(mapStateToProps,mapDispatchToProps)(Counter)
+
+// 22 、简化2写法
+// dispatch原本就是connect传递进来的  bindActionCreators 是redux方法接收 actions和dispatch 会包装成 1 返回的那种形式 
+
+// function bindActionCreators(actions,dispatch){
+//   let obj = {}
+//   for(let key in actions){
+//     obj[key] = (...args)=>dispatch(actions[key](...args))
+//   }
+//   return obj;
+// }
+// export default connect(mapStateToProps,(dispatch)=>bindActionCreators(actions,dispatch))(Counter)
+
+// 3、如果connect 第一次执行的函数,如果第二个参数是对象类型,会自动内部调用bindActionCreators来实现
+// export default connect(mapStateToProps,actions)(Counter)
+
+```
+## 中间件
+### logger
+```js
+import {createStore} from '../redux';
+import reducers from './reducers';
+let store = createStore(reducers)
+let dispath = store.dispatch;//缓存老的原始派发方法
+sotre.dispath = function(action){
+  console.log('老状态',store.getState())
+  dispath(action);
+  console.log('新状态',store.getState())
+}
+export default store
+
+```
+
+- 原理
+- 创建react-redux/connect.js
+```js
+import Context from './context'
+import React, { Component } from 'react'
+import {bindActionCreators} from 'redux';
+
+let connect =(mapS,mapD)=>(Component)=>{
+  return ()=>{
+    class Proxy extends React.Component{
+      state = mapS(this.props.store.getState())
+      componentDidMount() {
+        this.unsub = this.props.store.subscribe(()=>{
+          this.setState(mapS(this.props.store.getState()))
+        })
+      }
+      componentWillUnmount(){
+        this.unsub()
+      }
+      render(){
+        let  d;
+        if(typeof mapD === 'object'){
+          d = bindActionCreators(mapD,this.props.store.dispatch)
+        }else{
+          d = mapD(this.props.store.dispatch)
+        }
+        return <Component {...this.state} {...d} ></Component> 
+      }
+    }
+  return (<Context.Consumer>
+    {({store})=>{
+      return <Proxy store={store}></Proxy>
+    }}
+    </Context.Consumer>)
+}
+}
+export default connect
+```
+- 创建react-redux/context.js
+```js
+import react from 'react'
+
+let Context = react.createContext()
+
+export default Context
+```
+- 创建react-redux/index.js
+```js
+import Provider from './provider'
+import connect from './connect'
+export {Provider,connect}
+```
+- 创建react-redux/provider.js
+```js
+import context from './context'
+import React, { Component } from 'react'
+
+export default class Provider extends React.Component{
+  render(){
+    return (
+      <context.Provider value={{store:this.props.store}}>
+      {this.props.children}
+      </context.Provider>
+    )
+  }
+} 
+
+```
 
 ## couter&&todoList 例子
 - 目录
@@ -491,7 +658,7 @@ ReactDOM.render(
   , document.getElementById('root'));
 ```
 
-- saga.js (待完善)
+- saga.js 
 ```js
 import {takeEvery,put} from 'redux-saga/effects'
 import * as Types from './store/types'
@@ -514,11 +681,11 @@ export function * minus() {
 }
 ```
 
-## redux核心
+## redux 源码
 ```js
 function CreateStore(reducer) {
   let state;
-  let getters = () => state;
+  let getState = () => state;
   let listeners = [];
   let dispatch = (action)=>{
     state = reducer(state,action)
@@ -532,18 +699,160 @@ function CreateStore(reducer) {
     }
   }
   return {
-    getters,
+    getState,
     dispatch,
     subscribe
   }
 }
-export { CreateStore };
+
+/*
+ bindActionCreators 按照下面仿制的
+let mapDispatchToProps = (dispatch) => { //store.dispatch
+  return{
+    del:(num)=>dispatch(actions.del(3))
+  }
+}
+export default connect(mapStateToProps,mapDispatchToProps)(Counter)
+*/
+function bindActionCreators(actions,dispatch){
+  let obj = {}
+  for(let key in actions){
+    obj[key] = (...args)=>dispatch(actions[key](...args))
+  }
+  return obj;
+}
+
+// combineReducers 合并reducer 用法
+// import counter from './counter'
+// import subtraction from './subtraction'
+// import { combineReducers } from 'redux'
+// export default combineReducers({counter,subtraction})
+
+// 原理 
+// reducers是单个reducer组成的
+function combineReducers(reducers){
+  // 这里的state是一个总的
+  return function(state={},action){
+    let obj = {}
+    for(let key in reducers){
+      //为什么state加key 因为这个要给用户点的 
+      obj[key] = reducers[key](state[key],action)
+    } 
+   return obj
+  }
+}
+
+
+// compose 原理
+function add1(str){
+  return '1' + str
+}
+function add2(str){
+  return '2' + str
+}
+function add3(str){
+  return '3' + str
+}
+// compose作用将参数传递给左边第一个 他的返回值在传递给左边的 一直下去
+let rs = compose(add1,add2,add3)('zzz')
+console.log(rs)// 123zzz
+
+function compose(...fns){
+  if(fns.length === 0) return args=>args;
+  if(fns.length === 1) return fns[0];
+  // fns.reduce((add1,add2)=>('zzz') => a(b('zzz')))
+  // ...args 就是指 'zzz'
+  return fns.reduce((a,b)=>(...args) => a(b(...args)))
+}
+
+
+// logger中间件 {getState,dispatch},dispatch,action 都是默认的 根据applyMiddleware 来的
+function logger({getState,dispatch}){
+  return function(next){
+    return function(action){
+      console.log('老状态',getState())
+      next(action);
+      console.log('老状态',getState())
+    }
+  }
+}
+//或者
+let logger = store => dispatch => action=>{}
+
+// 中间件的用法
+ let store =  applyMiddleWare(logger)(createStore)(reducer);
+
+// applyMiddleware中间件写法 模仿可以跟着中间件的用来的写,最终就是要返回一个store  
+// 第一个参数就是中间件
+function applyMiddleware(...middlewares){
+  return function(createStore){
+    return function(reducer){
+      let store = createStore(reducer)
+      //1
+      let dispatch = ()=>{throw Error('xxx')}
+      let middleswareApi = {
+        getState:store.getState,
+        // 这里的dispatch 为毛要加后面的  因为下面dispatch(3) 重新赋值后导致dispatch(1)变化 如果不加后面的 此处的dispatch始终等于 ()=>{throw Error('xxx')}
+        dispatch:(...args)=>dispatch(...args)
+      }
+      const chain =  middlewares.map(middleware=>middleware(middleswareApi))
+      // 3
+      dispatch = compose(...chain)(store.dispatch)
+      return {
+        ...store,
+        dispatch
+      }
+    }
+  }
+}
+
+
+export { CreateStore, bindActionCreators, combineReducers, applyMiddleware};
+
+```
+## redux-thunk 原理
+```js
+function createThunkMiddleware() {
+  return ({dispatch,getState })=>next=>action{
+    if(typeof action == 'function'){
+      // 传递过来的action是一个 函数
+      return action(dispatch,getState )
+    }else{
+      return next(action)
+    }
+  }
+}
+const thunk = createThunkMiddleware();
+thunk.withExtraArgument = createThunkMiddleware;
+
+export default thunk;
 ```
 
 ## redux-saga 原理
+- redux-saga是一个中间件
+- 在reducers中所有的操作都是同步,reducers是纯函数
+- sage采用Generator函数用来yield Effects
+- Effects是一个简单的对象，该对象包含了一些给middleware解释执行的信息
+- 可以通过使用effects API 如fork,call,take,put,cancel等来创建
+- 步骤
+  - 1、rootSaga 入口saga 是用来组织和调用别的saga的
+  - 2、watcher saga监听被dispatch的actions,当接收到action或者知道其被触发时,调用worker执行任务
+  - 3、worker saga做实际的工作,如调用api进行异步请求
+  
 - 用法
+  - 在store入口使用
+  - 创建一个saga文件
+  - effect有很多方法(takeEvery,put,take,call,all,delay,cps,select)
+    - all 类似promise.all 可以放多个
+    - take 只监听(动作)一次 会阻塞 执行他会有一个返回值 就是监听的action,'*'监听所有(通配符)
+    - put 派发动作(就时一个dispatch) take监听 put派发 take 和 put 不能传递一样的类型 会无线循环
+    - takeEvery(action,Generator) takeEvery会监听action 去执行Generator 监听每一次 不会阻塞 他就等于take 和 put 都执行一次
+    - delay 就是一个slepp传递一个时间 
+    - cps 接收一个普通的方法
+    - call 处理异步 接收一个promise的方法
+    - select 执行返回仓库的状态(state)
 ```js
-  // store/index
+  // store/index 文件
   import createSagaMiddleware  from 'redux-saga'
   import rootSaga from '../saga'
   let sageMiddleware = createSagaMiddleware()
@@ -552,16 +861,16 @@ export { CreateStore };
   //运行
   sageMiddleware.run(rootSaga)
 
-  // src/saga
-  import {takeEvery,put,take} from './redux-saga/effect'
+  // src/saga 文件
+  import {takeEvery,put,take,call,all } from './redux-saga/effect'
   import * as Types from './store/types'
   
-  // rootSage 是核心的 导出函数
-  export default function * rootSage(){
+  // rootSaga 是核心的 导出函数
+  export default function * rootSaga(){
     for(var i=0;i<3;i++){
       console.log(`第${i}次`)
       // take监听一次 会触发 subscribe  
-      // 默认rootSage会执行一次  也就是take会被
+      // 默认rootSaga会执行一次  也就是take会被
       // take 里面的type 要和 按键触发的 type 一样 才能触发 put
       yield take(Types.SAGA_ADD)
       // put 当点击的时候 才触发他
@@ -584,6 +893,30 @@ export { CreateStore };
   //   yield delay(1000);//产出了一个promise
   //   //put相当于dispatch(action)
   //   yield put({type:Types.INCREMENT,count:1})
+  // }
+// call 一般异步用
+  // const delay = ms =>new Promise((res,rej)=>{
+  //   // setTimeout(res,ms)
+  //   setTimeout(()=>{
+  //       res('--',new Date())
+  //   },ms);
+  // })
+
+  // export default function * rootSaga(){
+  // let date = yield call(delay,1000)
+  // }
+
+// all 全部的意思 promise.all
+
+  // function* helloSaga1(){
+  //   console.log('helloSaga1')
+  // }  
+  // function* helloSaga2(){
+  //   console.log('helloSaga2')
+  // }  
+  // export default function * rootSaga(){
+  //   yield all([helloSaga1(),helloSaga2()]);
+  //   console.log('the end')
   // }
 
   再派发的时候 只需要添加 type 对应的类型  每次触发 redux-saga就会拦截处理
@@ -816,7 +1149,424 @@ export default function * rootSaga(){
   console.log('the end')
 }
 ```
+## typescript
+- Typescript是Javascript的超集，遵循最新的ES5/ES6规范。TypeScript扩展了Javascript语法
+
+
+## umi
+- UmiJS是一个类 Next.JS 的 react 开发框架。
+- 他基于一个约定，即 pages 目录下的文件即路由，而文件则导出 react 组件
+- umi 里约定目录下有 _layout.js 时会生成嵌套路由
+<img :src="$withBase('/img/umi.png')" >
+
+
+
+## hooks
+
+- Hook 是 React 16.8 的新增特性。它可以让你在不编写 class 的情况下使用 state 以及其他的 React 特性
+- 以前时用class 才能用state 现在用函数就可以直接操作state
+- 特点
+  - 在可以用在函数组件中,并且可以在函数组件的多次渲染之间保持不变
+### useState (useState可以定义多个)
+  - useState有两种写法 useState(0)和useState(()=>{})
+  - let [state,setState] = useState(0)
+```js
+import React,{useState} from 'react';
+// 类
+class Counter extends React.Component {
+  constructor(props) {
+      super(props);
+      this.state = {
+          number: 0
+      };
+  }
+  render() {
+      return (
+          <div>
+              <p>{this.state.number}</p>
+              <button onClick={() => this.setState({ number: this.state.number + 1 })}>
+                  +
+        </button>
+          </div>
+      );
+  }
+}
+// 函数
+function Counter2(){
+  // number,setNumber自己独有的
+  const [number,setNumber] = useState(0);
+  return (
+      <>
+          <p>{number}</p>
+          <button onClick={()=>setNumber(number+1)}>+</button>
+      </>
+  )
+}
+export default Counter2;
+```
+- 每次渲染都是独立的闭包
+- 函数式更新
+- 如果新的 state 需要通过使用先前的 state 计算得出，那么可以将函数传递给 setState。该函数将接收先前的 state，并返回一个更新后的值
+```js
+function Counter2(){
+  const [number,setNumber] = useState(0);
+  function lazy(){
+    setTimeout(()=>{
+      // 每次获取的是当时的number 3秒后是调用的还是之前的number
+      setNumber(number+1);
+    },3000);
+  }
+  function lazyFunc(){
+    setTimeout(()=>{
+      // 每次获取的是最新的 number 3秒后是调用的是最新的 number
+      setNumber(number=>number+1);
+    },3000);
+  }
+  return (
+      <>
+          <p>{number}</p>
+          <button onClick={()=>setNumber(number+1)}>+</button>
+          <button onClick={lazy}>lazy+</button>
+      </>
+  )
+}
+```
+- 惰性初始 state
+- 如果你修改状态的时候,直接传的是老状态,则不重新渲染
+```js
+function Counter3(){
+  const [{name,number},setValue] = useState(()=>{
+    return {name:'计数器',number:0};
+  });
+  return (
+      <>
+          <p>{name}:{number}</p>
+          <button onClick={()=>setValue({number:number+1})}>+</button>
+      </>
+  )
+}
+```
+
+### memo&&PureComponent - useMemo&&usecallback
+- 父组件变化,子组件不变化,子组件默认会重新渲染,可以用下面2个方法(都是react里面的)包装后就不会重新渲染
+- memo针对函数 (子组件不接收值的情况下)
+- PureComponent 针对类
+- 为什么父组件重新渲染,子组件不变的情况下,子组件还需要重新渲染
+  - 因为addClick 和 data 是父组件传递给子组件的,父组件有值变化整个组件会重新渲染导致addClick 和 data重新赋值
+- useMemo&&usecallback 
+  - 第二个参数要给,会监控他的值是否有变化
+  - useMemo(针对变量) 会判断组件变化前后值是否有变化 没有变化就将上次的值传过去(默认情况下,重新生成的对象值不变但是引用地址变化了)
+  - usecallback(针对方法) 原理同上
+```js
+// 子
+function SubCounter({onClick=()=>{},data={number:0}}){
+  console.log('zi')
+  return(
+    <button onClick={onClick}>{data.number}</button>
+  )
+}
+SubCounter = memo(SubCounter)
+// 父
+let oldData,oldAddClick;
+function counter(props){
+  console.log('fu')
+  const [name,setName] = useState('计数器')
+  const [number,setNumber] = useState('计数器')
+
+  const addClick = ()=>{
+    setNumber(number+1)
+  }
+  console.log('addClick=',addClick == oldAddClick) //引用地址不一样 返回false
+  oldAddClick = addClick;
+  const  data = {number} 
+  console.log('data=',data == oldData) //引用地址不一样 返回false
+  oldData = data
+    return(
+      <>
+        <input type='text' value={name} onChange={(e)=>setName(e.target.value)} />
+        <SubCounter />
+      </>
+    )
+}
+// useMemo&&usecallback 配合memo的 修改后 
+function SubCounter({onClick=()=>{},data={number:0}}){
+  console.log('zi')
+  return(
+    <button onClick={onClick}>{data.number}</button>
+  )
+}
+SubCounter = memo(SubCounter);
+let oldData,oldAddClick;
+const App = function counter(props){
+  console.log('fu')
+  const [name,setName] = useState('计数器')
+  const [number,setNumber] = useState('计数器')
+
+  const addClick = useCallback(()=>{
+    setNumber(number+1)
+  },[number])
+  console.log('addClick=',addClick == oldAddClick)
+  oldAddClick = addClick;
+  const  data = useMemo(()=>({number}),[number]) 
+  console.log('data=',data == oldData)
+  oldData = data
+  return (<>
+      <input type='text' value={name} onChange={(e)=>setName(e.target.value)} />
+      <SubCounter onClick={addClick} data={data}/>
+    </>
+  ) 
+}
+```
+### useReducer
+- useState 的替代方案。它接收一个形如 (state, action) => newState 的 reducer，并返回当前的 state 以及与其配套的 dispatch 方法
+- 在某些场景下，useReducer 会比 useState 更适用，例如 state 逻辑较复杂且包含多个子值，或者下一个 state 依赖于之前的 state 等
+```js
+// useReducer 用法
+const [state, dispatch] = useReducer(reducer, initialArg, init);
+// 
+const initialState = 0;
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'increment':
+      return {number: state.number + 1};
+    case 'decrement':
+      return {number: state.number - 1};
+    default:
+      throw new Error();
+  }
+}
+function init(initialState){
+    return {number:initialState};
+}
+function Counter(){
+    const [state, dispatch] = useReducer(reducer, initialState,init);
+    return (
+        <>
+          Count: {state.number}
+          <button onClick={() => dispatch({type: 'increment'})}>+</button>
+          <button onClick={() => dispatch({type: 'decrement'})}>-</button>
+        </>
+    )
+}
+```
+### useContext 
+  - 接收一个 context 对象（React.createContext 的返回值）并返回该 context 的当前值
+  - 当前的 context 值由上层组件中距离当前组件最近的 <MyContext.Provider> 的 value prop 决定
+  - 当组件上层最近的 <MyContext.Provider> 更新时，该 Hook 会触发重渲染，并使用最新传递给 MyContext provider 的 context value 值
+  - useContext(MyContext) 相当于 class 组件中的 static contextType = MyContext 或者 <MyContext.Consumer>
+  - useContext(MyContext) 只是让你能够读取 context 的值以及订阅 context 的变化。你仍然需要在上层组件树中使用 <MyContext.Provider> 来为下层组件提供 context
+  ```js
+  const CounterContext = React.createContext();
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'increment':
+      return {number: state.number + 1};
+    case 'decrement':
+      return {number: state.number - 1};
+    default:
+      throw new Error();
+  }
+}
+function Counter(){
+  let {state,dispatch} = useContext(CounterContext);
+  return (
+      <>
+        <p>{state.number}</p>
+        <button onClick={() => dispatch({type: 'increment'})}>+</button>
+        <button onClick={() => dispatch({type: 'decrement'})}>-</button>
+      </>
+  )
+}
+function App(){
+    const [state, dispatch] = useReducer(reducer, {number:0});
+    return (
+        <CounterContext.Provider value={{state,dispatch}}>
+            <Counter/>
+        </CounterContext.Provider>
+    )
+
+}
+  ```
+### effect
+- useEffect 就是一个 Effect Hook，给函数组件增加了操作副作用的能力。它跟 class 组件中的 componentDidMount、componentDidUpdate 和 componentWillUnmount 具有相同的用途，只不过被合并成了一个 API
+- 简单理解 每次渲染都会执行useEffect
+- 下面例子,如果没有返回清除定时器,那么每次渲染一次就多开一个定时器,返回值在下次useEffect生效前执行
+- 或者给useEffect第二个参数一个空数组,他会监视第二个参数是否有变化,空数组始终不会有变化,useEffect里面的函数就不会重新执行
+```js
+function Counter(){
+  const [number,setNumber] = useState(0);
+  // 相当于componentDidMount 和 componentDidUpdate
+  useEffect(() => {
+     console.log('开启一个新的定时器')
+     const $timer = setInterval(()=>{
+      setNumber(number=>number+1);
+     },1000);
+      return ()=>{
+        console.log('销毁老的定时器');
+        clearInterval($timer);
+     } 
+  });
+  //   useEffect(() => {
+  //    console.log('开启一个新的定时器')
+  //    const $timer = setInterval(()=>{
+  //     setNumber(number=>number+1);
+  //    },1000);
+  // },[]);
+  return (
+      <>
+          <p>{number}</p>
+      </>
+  )
+}
+```
+### useRef(函数里面用)&&createRef(类里面用)
+- useRef返回一个可变的ref对象,其.current属性被初始化为传入的参数
+- 返回的ref对象在组件的整个生命周期保持不变
+
+```js
+import {useRef,createRef} from 'react';
+function Child(){
+  const inputRef1 = createRef()// {current:''} 每次获取的对象不是同一个 值是一样的
+  const inputRef = useRef()// {current:''} 每次获取的对象是一个 值是一样的
+  function getFocus(){
+    inputRef.current.focus()
+  }
+  return (
+    <>
+      <input ref={inputRef}>
+      <button onClick={getFocus}> 获取焦点</button>
+    </>
+  )
+}
+```
+### forwardRef
+- 将ref从父组件中转发到子组件中的dom元素上
+- 子组件接受props和ref作为参数
+```js
+function Child(props,ref){
+  return (
+    <input type="text" ref={ref}/>
+  )
+}
+Child = forwardRef(Child);
+function Parent(){
+  let [number,setNumber] = useState(0); 
+  const inputRef = useRef();
+  function getFocus(){
+    inputRef.current.value = 'focus';
+    inputRef.current.focus();
+  }
+  return (
+      <>
+        <Child ref={inputRef}/>
+        <button onClick={()=>setNumber({number:number+1})}>+</button>
+        <button onClick={getFocus}>获得焦点</button>
+      </>
+  )
+}
+```
+### useImperativeHandle 
+- useImperativeHandle 可以让你在使用 ref 时自定义暴露给父组件的实例值
+- 在大多数情况下，应当避免使用 ref 这样的命令式代码。useImperativeHandle 应当与 forwardRef 一起使用
+```js
+function Child(props,ref){
+  const inputRef = useRef();
+  useImperativeHandle(ref,()=>(
+    {
+      focus(){
+        inputRef.current.focus();
+      }
+    }
+  ));
+  return (
+    <input type="text" ref={inputRef}/>
+  )
+}
+Child = forwardRef(Child);
+function Parent(){
+  let [number,setNumber] = useState(0); 
+  const inputRef = useRef();
+  function getFocus(){
+    console.log(inputRef.current);
+    inputRef.current.value = 'focus';
+    inputRef.current.focus();
+  }
+  return (
+      <>
+        <Child ref={inputRef}/>
+        <button onClick={()=>setNumber({number:number+1})}>+</button>
+        <button onClick={getFocus}>获得焦点</button>
+      </>
+  )
+}
+```
+### useLayoutEffect
+- 其函数签名与 useEffect 相同，但它会在所有的 DOM 变更之后同步调用 effect
+- 可以使用它来读取 DOM 布局并同步触发重渲染
+- 在浏览器执行绘制之前useLayoutEffect内部的更新计划将被同步刷新
+- 尽可能使用标准的 useEffect 以避免阻塞视图更新
+```js
+function LayoutEffect() {
+    const [color, setColor] = useState('red');
+    useLayoutEffect(() => {
+        alert(color);
+    });
+    useEffect(() => {
+        console.log('color', color);
+    });
+    return (
+        <>
+            <div id="myDiv" style={{ background: color }}>颜色</div>
+            <button onClick={() => setColor('red')}>红</button>
+            <button onClick={() => setColor('yellow')}>黄</button>
+            <button onClick={() => setColor('blue')}>蓝</button>
+        </>
+    );
+}
+```
+### 自定义hooks
+- 只要说一个方法,方便名的前缀是use开头,并且在函数内使用hooks,那么他就是一个自定义的hooks
+```js
+import React,{useEffect,useState} from 'react'
+import ReactDOM from 'react-dom'
+function useNumber(){
+  let [number,setNumber] = useState(0)
+  useEffect(() => {
+    setInterval(()=>{
+      setNumber(number=>number+1)
+    },1000)
+  }, [])
+  return  [number,setNumber]
+}
+
+function Counter1(){
+  let  [number,setNumber] = useNumber()
+  return (
+      <div>
+        <button onClick={()=>setNumber(number+1)}>{number}</button>
+      </div>
+      )
+}
+function Counter2(){
+  let  [number,setNumber] = useNumber()
+  return( 
+      <div>
+        <button  onClick={()=>setNumber(number+1)}>{number}</button>
+      </div>
+  )
+}
+const App = ()=>(<>
+  <Counter1/>
+  <Counter2/>
+</>)
+
+app.router(()=><App />);
+```
 ## dva用法
+
+
 - 流程图
 - 脚手架
   - npm install dva-cli@next -g(1+ 的版本采用的umi)
@@ -825,6 +1575,14 @@ export default function * rootSaga(){
   - cnpm i styled-components -S
   - npm start
 <img :src="$withBase('/img/dva.png')" >
+- 自己搭建
+  - create-react-app dva-app
+  - cd dva-app
+  - cnpm i dva -S
+- 使用dva三步
+  - 1、定义模型
+  - 2、定义路由
+  - 3、app.start(  '#root')开始把路由定义渲染到#root里
 - 基本使用
 ```js
 import React from 'react'
@@ -842,12 +1600,13 @@ const get = (url)=>{
   let rs = fetch(url).then(res=>res.json())
   return rs
 }
-
+// 定义模型
 app.model({
   //里面的是 子状态
   namespace:'count',
   state:{number:0},
   reducers:{
+    // key就是动作类型,当你向仓库派发add动作的时候,就会执行对应的reducer修改仓库中的状态d
     //相当于action type 参数是老状态 返回值是新状态
     add(state,{payload}){
       // 数据持久化
@@ -879,7 +1638,8 @@ app.model({
   }
 });
 
-
+// connect里面传递action props就没有dispatch(2个方法不兼容)
+// 默认都不传递  直接用dispatch type后面要配合匿名空间 
 const App = connect(
   state=>state.count
 )((props)=>(
@@ -1033,5 +1793,43 @@ export default function(){
 
   return _app
 }
+
+## 装饰器(高阶组件)
+```js
+@testable
+class Person{
+
+}
+function testable(target){
+  target.testable = true
+}
+
+console.log(Person.testable)
 ```
 
+## dva配合ant
+- antd 按需引入
+  - npm install antd babel-plugin-import --save
+- 然后在 .webpackrc 中添加如下配置：
+```js
+{
+  "extraBabelPlugins": [
+    ["import", {
+      "libraryName": "antd",
+      "libraryDirectory": "es",
+      "style": true
+    }]
+  ]
+}
+```
+
+
+## DOM DIFF
+- DOM Diff比较两个虚拟DOM区别 比较两个对象的区别
+- dom diff作用 根据2个虚拟对象创建出补丁，描述改变的内容，将这个补丁更新dom
+
+- 差异计算
+- 先序深度优先遍历
+
+- 三种优化策略
+  - 

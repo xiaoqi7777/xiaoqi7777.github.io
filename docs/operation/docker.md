@@ -95,11 +95,33 @@ systemctl restart docker
 ```js
 1、node 安装
     wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | bash
+    source ~/.bashrc
     nvm install stable
     node -v
     npm i cnpm -g
     npm i nrm -g
 
+    文件传输要安装 rz
+    yum install lrzsz
+ 
+    service nginx status //查看nginx开启状态
+    service nginx start
+    
+    // 使用lsof
+    yum install lsof
+    lsof -i:8080 //查看8080端口
+  
+    // 杀进程
+    kill -s 9 进程号
+
+    // 开启服务 后台运行
+    node serve.js &
+
+    // 安装 git
+    yum install -y git
+    // 创建git用户
+    useradd git
+    passwd git
 2、安装express
     npm install express-generator -g
     express app

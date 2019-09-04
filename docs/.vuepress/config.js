@@ -7,72 +7,104 @@ module.exports = {
     nav: [
       {
         text: "前端",
-        link: "/qianduan/"
+        link: "/front/"
       },
       {
         text: "后端",
         link: "/houduan/"
       },
       {
-        text: "运维",
+        text: "operation",
         link: "/operation/"
       },
       {
-        text: "内功",
+        text: "foundation",
         link: "/foundation/"
+      },
+      {
+        text: "article",
+        link: "/article/"
       },
       {
         text: "GitHub",
         link: "https://github.com/xiaoqi7777"
-      }
+      },
+      {
+        text: "about",
+        link: "/about/"
+      },
     ],
     sidebar: {
-      "/qianduan/": [
+      "/article/":[
         {
-          title: '前端基础汇总',
+          title:"article",
+          collapsable:false,
+          children:[
+            "webpack",
+            "module",
+            "vueAnalysis",
+            "promise",
+            "wx",
+            "frontModle",
+            "vuePlugin",
+            "jwtPrinciple",
+            "routerAuth"
+          ]
+        }
+      ],
+      "/front/": [
+        {
+          title: 'front',
           collapsable: false,
           children: [ 
+            "css",
             "js",
             "react",
             "vue",
             "vuepress",
             "phone",
-            "webpack"
+            "webpack",
+            "video"
           ]
         }
       ],
       "/houduan/":[
         {
-          title: "后端基础汇总",
+          title: "houduan",
           collapsable: false,
           children: [ 
             "node",
             "ios",
             "mongodb",
             "egg",
-            "mock"
+            "mock",
+            "wx",
+            "koa",
+            "http"
           ]
         }
       ],
       "/operation/":[
         {
-          title: "运维",
+          title: "operation",
           collapsable: false,
           children: [
             "git",
             "nginx",
             "linux",
-            "docker"
+            "docker",
+            "jenkins"
           ]
         }
       ],
       "/foundation/":[
         {
-          title: "内功",
+          title: "foundation",
           collapsable: false,
           children: [
             "design",
-            "algorithm"
+            "algorithm",
+            "subject"
           ]
         }
       ]

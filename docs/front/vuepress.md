@@ -112,6 +112,16 @@ assets 是public 下面的目录
 | col 2 is      | centered      |   $12 |
 | zebra stripes | are neat      |    $1 |
 ```
+vue组件使用
+- 1、写好components/me.vue组件
+- 2、创建xx.md文件 配置为路由
+  - layout 写components 里面的文件名字
+```js
+---
+layout: me
+---
+<!-- 放vue组件即可显示 -->
+```
 
 记坑: 
 1、配置的lastUpdated  显示更新时间  必须要用git命令执行

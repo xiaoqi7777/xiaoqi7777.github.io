@@ -937,6 +937,18 @@ l.tap() //注册这两个事件
 l.start('xx') //启动钩子
 
 ```
+## resolveLoader解析loader路径的
+```js
+resolveLoader:{
+  // 第三方模块默认 查找的位子
+  modules:['node_modules',path.resolve(__dirname,'loaders')]
+  // 配置别名
+  alias:{
+    // 在loader中使用 loader1 就指向 __dirname/loaders/loaders1.js
+    loader1:path.resolve(__dirname,'loaders','loaders1')
+  }
+}
+```
 
 ## 手写webapck
 - npx webpack  
@@ -962,4 +974,690 @@ l.start('xx') //启动钩子
   }
   
   运行 npm link
+```
+- 制作 webpack-pack
+- webpack-pack/bin/index 入口文件
+```js
+#! /usr/bin/env node
+// 1、获取webpack.config.js 配置文件
+let path = require('path');
+
+// 2、通过当前执行命令的目录 解析除webpack.config.js 在那儿执行就在那儿找webpack.config.js
+let config = require(path.resolve('webpack.config.js')) 
+
+// 主的类 Compiler 编译
+let Compiler = require('../lib/Compiler.js')
+
+// 根据用户创建的配置文件 进行编译
+let compiler = new Compiler(config)
+
+compiler.hooks.entryOption.call()
+
+compiler.run()//开始运行
+```
+- webpack-pack/lib/Compiler 
+- babylon 解析（parse）
+  - Babylon 是 Babel 的解析器。最初是 从Acorn项目fork出来的。Acorn非常快，易于使用。
+- @babel/traverse 
+  - Babel Traverse（遍历）模块维护了整棵树的状态，并且负责替换、移除和添加节点。我们可以和 Babylon 一起使用来遍历和更新节点。
+- @babel/generator
+  - Babel Generator模块是 Babel 的代码生成器，它读取AST并将其转换为代码和源码映射
+- webpack流程 
+  - 1、获取配置文件(webpack.config.js)
+  - 2、获取所有的资源(this.getSource =>只针对 require 引入的文件)
+  - 3、buildMoudle 函数 获取每一个 绝对路径(moduleId)对应的代码(sourceCode) ast解析(this.parse)
+  - 4、ejs配合模板渲染数据 ejs.render()
+  - 5、根据配置文件的output 路径 将获取的数据写入
+```js
+// ejs 用来拼接字符串
+// tapable 用来发布订阅
+let path = require('path');
+let fs = require('fs');
+//  下面4个功能 ast  1) 转换树 2) 遍历树 3)更改树  4)输出代码
+let babylon = require('babylon'); // 转换成树
+let traverse = require('@babel/traverse').default; // 遍历树
+let t = require('@babel/types'); // 更改树 es模块需要 多.default
+let generator = require('@babel/generator').default;
+
+let ejs = require('ejs');
+let {SyncHook} = require('tapable')
+
+class Compiler{
+  constructor(config){
+    // 配置文件
+    this.config = config
+    // 需要获取当前执行命令的绝对路径
+    this.root = process.cwd()
+    // 找到配置文件中的入口
+    this.entry = config.entry
+    // 入口文本的id
+    this.entryId;
+    //所有的依赖列表
+    this.modules = {},
+
+    this.hooks = {
+      entryOption: new SyncHook(),
+      run: new SyncHook(),
+      compile:new SyncHook(),
+      afterCompile:new SyncHook(),
+      afterPlugins:new SyncHook(),//插件都执行完成后调用此方法
+      emit:new SyncHook(),//文件发射出来了
+      done:new SyncHook()
+    }
+    if(Array.isArray(config.plugins)){
+      config.plugins.forEach(p=>{
+        // 每个插件都需要有一个apply方法
+        p.apply(this);//每个插件都能拿到compiler对象
+      })
+    }
+    this.hooks.afterPlugins.call();
+
+  }
+  getSource(modulePath){//获取资源
+    // 需要判断 modulePath 是否是less文件
+    // 获取规则
+    let rules = this.config.module.rules;//所有的规则
+    let content = fs.readFileSync(modulePath,'utf8');
+    for(let i=0;i<rules.length;i++){
+      let rule = rules[i]
+      let {test,use} = rule
+      let len = use.length - 1;//默认定位到最后一个loader
+      if(test.test(modulePath)){
+        // 这个路径需要用loader来解析
+        function normalLoader(){
+          // loader 可以是一个路径 本质是一个函数
+          let loader = require(use[len--]);
+          content = loader(content);
+          if(len>=0){
+            normalLoader();//递归来解析loader
+          }
+        }
+        normalLoader()
+
+      }
+    }
+    return content
+  }
+  // 创建模块
+  // 第一个是绝对路径 第二个是否是主入口
+  buildMoudle(modulePath,isEntry){
+    // 文件源代码
+    let source = this.getSource(modulePath)
+    // modulePath 目前是绝对路径 path.relative在绝对路径中找相对路径
+    let moduleId = './' + path.relative(this.root , modulePath)
+    // console.log('==',moduleId,'-',source)
+    if(isEntry){
+      //如果是主模块
+      this.entryId = moduleId
+    }
+    // AST语法解析 写一个专门的方法来解析源代码
+    // 处理当前模块的父路径 path.dirname
+    // sourceCode就是转换后的代码
+    let {sourceCode,dependencies} = this.parse(source,path.dirname(moduleId)) // 取到的就是./src
+    this.modules[moduleId] = sourceCode;
+    // 需要拿到当前文件的依赖 递归搜索依赖
+    dependencies.forEach(dep=>{
+      this.buildMoudle(path.join(this.root,dep))
+    });
+    // console.log('sourceCode',dependencies)
+  }
+  // yarn add babylon @babel/traverse @babel/generator @babel/types
+  parse(source,parentPath){
+    let ast = babylon.parse(source)
+    let dependencies = [];//存放依赖关系的
+    traverse(ast,{
+      CallExpression(p){
+        let node = p.node;
+        // 找到require
+        if(node.callee.name === 'require'){ //取到名字
+          node.callee.name = '__webpack_require__';
+          let moduleName = node.arguments[0].value;
+          moduleName = moduleName + (path.extname(moduleName)?'':'.js')
+          moduleName = './' + path.join(parentPath,moduleName)
+          // 把依赖添加进去
+          dependencies.push(moduleName)
+          // 替换变量名
+          node.arguments = [t.stringLiteral(moduleName)]
+        }
+      }
+    })
+    let sourceCode = generator(ast).code;
+    return {sourceCode,dependencies}
+    // ast 1) 转换树 2) 遍历树 3)更改树  4)输出代码
+    // esprima es-travarse esCodegen(webpack用的这个) 语法转换
+    // babel(babylon  @babel/traverse  @babel/types @babel/generator) 对应上面的1-4
+  }
+  // 开始运行
+  run(){
+    this.hooks.run.call()
+    // 1、创建模块 需要根据当前的绝对路径
+    this.hooks.compile.call()
+    this.buildMoudle(path.resolve(this.root,this.entry),true);
+    this.hooks.afterCompile.call()
+    // console.log(this.entryId,this.modules)
+    // 2、创建完后 把成功的文件写出来
+    this.emitFile();//发射文件
+    this.hooks.emit.call();
+    this.hooks.done.call()
+  }
+  emitFile(){
+    // 模板内容
+    let content = this.getSource(path.resolve(__dirname,'temp.ejs'))
+    // 
+    let str = ejs.render(content,{
+      modules:this.modules,
+      entryId:this.entryId
+    }) 
+    // 写入打包到的文件中
+    let main = path.join(this.config.output.path,this.config.output.filename);
+    fs.writeFileSync(main,str)
+
+  }
+}
+
+module.exports = Compiler
+```
+
+- webpack-pack/lib/temp.ejs 
+```js
+ (function(modules){
+  var installedModules = {};
+  function __webpack_require__(moduleId){
+    if (installedModules[moduleId]) {
+      return installedModules[moduleId].exports;
+    }
+    var module = installedModules[moduleId] ={
+      i: moduleId,
+      l: false,
+      exports: {}
+    };
+
+    modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+   
+    module.l = true;
+
+    return module.exports;
+  }
+  return __webpack_require__(__webpack_require__.s = "<%-entryId%>");
+
+ })({
+    <%for(let key in modules){%>
+      "<%-key%>":
+      (function (module,exports,__webpack_require__){
+        eval(`<%-modules[key]%>`);
+      }),
+    <%}%>
+ })
+
+```
+
+## 手写loader
+- loader组成 pitch + normal
+  - loader里面的 
+    - this.resourcePath 获取匹配到文件的路径
+    - loaderUtils = require('loader-utils')  options = loaderUtils.getOptions(this); options 是当前webpack配置的选项
+      - let filename = loaderUtils.interpolateName(this,'[hash].[ext]',{content:source})  根据图片格式生成图片路径
+      - this.emitFile(filename,source) // 发射文件
+    - 同步 用return source 返回数据  异步用 cb = this.async()  cb(err,source) 返回数据
+    - validateOptions = require('schema-utils') 创建骨架 用来比较传递进来的骨架是否类似
+    - loader 默认是字符串  当前loader.raw = true 将字符串转换成二进制流
+
+```js
+// 3个loader
+// loader1 文件
+function loader1 (source){ //normal
+  console.log('1111')
+  return source
+}
+loader1.pitch = ()=>{ //pitch
+  console.log('loader1')
+}
+
+module.exports = loader1
+
+// loader2 文件
+function loader1 (source){
+  console.log('222')
+  return source
+}
+loader1.pitch = ()=>{
+  console.log('loader3')
+}
+
+module.exports = loader1
+
+
+// loader3 文件
+function loader1 (source){
+  console.log('333')
+  return source
+}
+loader1.pitch = ()=>{
+  console.log('loader3')
+}
+module.exports = loader1
+
+
+rules:[
+  {
+    test:/.js$/,
+    use:{
+      loader:['loader1','loader2','loader3']
+    }
+  }
+]
+// 正常情况下没有pitch 执行顺序应该是 loader3=>loader2=>loader1=>
+// 加入pitch loader1.pitch => loader2.pitch => loader3.pitch =>loader3=>loader2=>loader1
+/* 
+  pitch作用 
+  若返回一个 字符串 那么跳过后面的pitch 和跳过当前的loader 进入下一个loader
+  比如 loader2.pitch return一个字符串 loader1.pitch => loader2.pitch =>loader1 (loader3.pitch =>loader3=>loader2 不会执行)
+*/
+```
+- 写法
+- 顺序问题 从右到左 从下到上
+- loader的分类 
+  - pre 在前面(enforce:pre,enforce来设置顺序)
+  - post 在后面
+  - normal 中间的
+  - 顺序pre->normal->inline->post
+  - inline-loader 内联loader 在代码中使用 不在webacpk内配置
+```js
+//1 、
+rules:[
+  {
+    test:/.js$/,
+    use:{
+      loader:['loader1','loader2','loader3']
+    }
+  }
+]
+//2 、
+rules:[
+  {
+    test:/.js$/,
+    use:{
+      loader:'loader1'
+    }
+  },
+    {
+    test:/.js$/,
+    use:{
+      loader:'loader2'
+    }
+  },
+    {
+    test:/.js$/,
+    use:{
+      loader:'loader3'
+    }
+  }
+]
+3、
+// 创建 inline.js
+function inlineLaoder (source){
+  console.log('inline------------------',source)
+  return source
+}
+module.exports = inlineLaoder
+
+// index.js
+let a = require('!!inline!./1.js')
+// 内联loader 只有在引用的时候处理 其他情况下不处理  在前面家前缀有不同的效果 inline loader不会每个文件都处理
+// -! 不会让文件 在去通过pre + normal loader来处理了
+// ! 没有normal
+// !! 上面都不要 只要inline 来处理
+```
+
+- loader 接受content('文件内容')
+  - 1、loader 都是函数 参数就是所有文件的内容
+  - 2、最后一个loader需要 返回一个js脚本的字符串 去执行
+  - 3、每个loader只做一件内容 为了使loader在个人难过场景链式使用
+  - 4、每一个loader都是一个模块
+  - 5、每个loader都是无状态的 确保loader在不同模块转换之间不保持状态
+```js
+//  原理 
+ getSource(modulePath){//获取资源
+    // 需要判断 modulePath 是否是less文件
+    // 获取规则
+    let rules = this.config.module.rules;//所有的规则
+    let content = fs.readFileSync(modulePath,'utf8');
+    for(let i=0;i<rules.length;i++){
+      let rule = rules[i]
+      let {test,use} = rule
+      let len = use.length - 1;//默认定位到最后一个loader
+      if(test.test(modulePath)){
+        // 这个路径需要用loader来解析
+        function normalLoader(){
+          // loader 原理
+          let loader = require(use[len--]);
+          // content 文件内容
+          content = loader(content);
+          if(len>=0){
+            normalLoader();//递归来解析loader
+          }
+        }
+        normalLoader()
+      }
+    }
+    return content
+  }
+```
+- 实现自己的loader 
+  - 作用:每个文件都加上自己想要注释的内容
+- banner-loader
+```js
+// banner-loader 编写
+let loaderUtils = require('loader-utils')
+// loaderUtils可以获取loader下面的options
+let validateOptions = require('schema-utils')
+// 创建骨架 用来比较传递进来的骨架是否类似
+let fs = require('fs')
+function loader(source){
+  // 是否开启缓存
+  this.cacheable(false)
+   let options =  loaderUtils.getOptions(this)
+   // 异步用this.async返回 否则直接用return
+   let cb = this.async()
+   let schema = {
+     type:'object',
+     properties:{
+       text:{
+         type:'string',
+       },
+       filename:{
+         type:'string'
+       }
+     }
+   }
+   validateOptions(schema,options,'banner-loader')
+   if(options.filename){
+     // 自动添加文件依赖  webapck开启watch:true 作用 依赖文件变化wenpack会重新打包
+     this.addDependency(options.filename)
+     fs.readFile(options.filename,'utf8',(err,data)=>{
+        cb(err,`/**${data}**/${source}`)
+      })
+    }else{
+      cb(null,`/**${options.text}**/${source}`)
+    }
+}
+module.exports = loader;
+
+//  webapck配置
+watch:true,
+module:{
+  rules:[
+    {
+      test:/\.js$/,
+      use:{
+        loader:'banner-loader',
+        options:{
+          presets:{
+            text:'珠峰',
+          },
+          filename:path.resolve(__dirname,'banner.js')
+        }
+      }
+    }
+}
+// 创建banner.js文件  输入=> songge
+```
+- babel-loader实现
+  - yarn add @babel/core @babel/preset-env
+```js
+let babel = require('@babel/core')
+let loaderUtils = require('loader-utils')
+function loader(source){
+  // this 当前上下文
+  let options =  loaderUtils.getOptions(this);
+  let cb = this.async();
+  babel.transform(source,{
+    ...options,
+    sourceMap:true,
+    filename: this.resourcePath.split('/').pop()
+  },(err,result)=>{
+    cb(err,result.code.result.map)
+  })
+}
+module.exports = loader
+```
+- less-loader 
+```js
+  // less 模块
+  let less = require('less');
+  function loader(source){
+    let css;
+    // 转换的过程,同步 
+    less.render(source,(err,output)=>{
+      css = output.css
+    });
+    // css = css.replace(/\n/g,'\n')
+    return css
+  }
+  module.exports = loader
+```
+
+- style-loader
+```js
+function loader(source){ //source less-loader转换后的结果
+  //最终的loader需要 返回一个js脚本的字符串
+  let str = `
+  let style = document.createElement('style');
+  style.innerHTML = ${JSON.stringify(source)}
+  document.head.appendChild(style)
+  `
+  return str
+}
+module.exports = loader
+```
+- file-loader
+```js
+let loaderUtils = require('loader-utils')
+
+// 他要导出一个路径
+function loader(source){
+  console.log('source',source)
+  // 根据图片格式生成图片路径
+  let filename = loaderUtils.interpolateName(this,'[hash].[ext]',{content:source})
+  this.emitFile(filename,source);// 发射文件
+  return `module.exports = "${filename}"`
+}
+loader.raw = true // 将源码转换成二进制
+module.exports = loader
+```
+-url-loader
+```js
+
+let loaderUtils = require('loader-utils')
+let mime = require('mime')
+function loader(source){
+  let options = loaderUtils.getOptions(this);
+  let limit = options.limit
+  if(limit && limit >source.length){
+    // this.resourcePath 文件路径
+    return `module.exports = "data:${mime.getType(this.resourcePath)};
+    base64,${source.toString('base64')}"`
+  }else{
+    return require('./file-loader').call(this,source)
+  }
+}
+loader.raw = true
+module.exports = loader
+// base64 格式 data:image/jpeg;base64,xxxxx;
+```
+
+## webpack 流程
+- 1、webpack.config.js 解析 成一个对象
+- 2、compiler编译 compiler=webpack(options); webapck初始化
+  - a、创建Compiler对象
+  - b、注册NodeEnvironmentPlugin插件
+  - c、挂在options中的plugins插件
+  - d、使用webpackOtptionApply初始化基础插件
+- 3、run(开始编译)
+  - a、调用compile开启编译
+  - b、创建Compilation对象
+    - 1、负责整体编译过程
+    - 2、内部保留对compiler对象引用this.compiler
+    - 3、this.entries入口
+    - 4、this.modules 所有模块
+    - 5、this.chunks 代码块
+    - 6、this.assets 所有的资源
+    - 7、template
+- 4、buildMoudle分析入口文件创建模块对象
+  - 1、获取所有资源
+  - 2、AST语法解析 
+  - 3、递归搜索依赖
+- 5、emitFile();//发射文件
+
+## 手写plugin
+- 插件都是类 作用监听每个钩子上的事件
+  - 每个插件都要有一个apply 方法
+  - 插件都是类 this 就是compile对象
+
+```js
+  //原理
+  if(Array.isArray(config.plugins)){
+    config.plugins.forEach(p=>{
+      // 每个插件都需要有一个 apply 方法
+      p.apply(this);//每个插件都能拿到 compiler(this) 对象
+    })
+  }
+```
+- 同步&&异步插件
+```js
+// 同步
+class DonePlugin {
+  apply(compiler){
+    compiler.hooks.done.tap('DonePlugin',(stats)=>{
+      console.log('编译完成~~')
+    })
+  }
+}
+
+module.exports = DonePlugin
+// 异步
+class AsyncPlugin {
+  apply(compiler){
+    console.log('222222222222')
+    compiler.hooks.emit.tapAsync('AsyncPlugin',(compliation,cb)=>{
+        setTimeout(()=>{
+          console.log('编译完成~~22')
+          cb()
+        },1000)
+    });
+    compiler.hooks.emit.tapPromise('AsyncPlugin',(compliation)=>{
+      return new Promise((resolve,reject)=>{
+        setTimeout(()=>{
+          console.log('编译完成~~333')
+          resolve()
+        },1000)
+      })
+  });
+  }
+}
+
+module.exports = AsyncPlugin
+```
+
+```js
+class P1  {
+  apply(compiler){
+    compiler.hooks.done.tap('p1',()=>{
+      console.log('done')
+    })
+  }
+}
+class P2  {
+  apply(compiler){
+    compiler.hooks.afterCompile.tap('p2',()=>{
+      console.log('afterCompile')
+    })
+  }
+}
+  plugins:[
+    new P1(),
+    new P2()
+  ]
+```
+- FileListPlugin 显示文件名字 和大小插件
+```js
+class FileListPlugin{
+  constructor({filename}){
+    this.filename = filename
+  }
+  apply(compiler){
+    // 文件已经准备好了 要进行发射
+    compiler.hooks.emit.tap('compiler',(compilcation)=>{
+        let assets = compilcation.assets;
+        // assets 存放所有打包资源 打包之后 就是bundle.js文件和index.html文件 后面添加 就直接打包添加的文件
+        // 格式[ [bundle.js,{}],[index.html,{}] ]
+        let content = `## 文件名 资源大小 \r\n `
+        Object.entries(assets).forEach(([filename,statObj])=>{
+          content += `- ${filename}  ${statObj.size()} \r\n`
+        })
+        // 资源对象 下面的就是打包出来的文件
+        assets[this.filename] = {
+          source(){
+            return content
+          },
+          size(){
+            return content.length
+          }
+        }
+    })
+  }
+}
+module.exports = FileListPlugin
+```
+- InlineSourcePlugin 把外链的标签 变成内联的标签
+```js
+// 把外链的标签 变成内联的标签
+const HtmlWebpackPlugin = require('html-webpack-plugin')
+class InlineSourcePlugin{
+  constructor(match){
+    this.match = match;//正则
+  }
+  progressTage(tag,compilation){// 处理某一个数据
+    let newTag,url;
+    if(tag.tagName === 'link' && this.reg.test(tag.attributes.href)){
+      newTag= {
+        tagName:'style'
+      }
+      url = tag.attributes.href
+    }
+    if(tag.tagName === 'scfript' && this.reg.test(tag.attributes.src)){
+      newTag= {
+        tagName:'scfript'
+      }
+      url = tag.attributes.src
+    }
+    if(url){
+      newTag.innerHTML = compilation.assets[url].source();//文件的内容放到innerHTML属性上面
+      delete compilation.assets[url];// 删除掉原来应生成的资源
+      return newTag
+    }
+    return tag;
+  }
+  progressTages(){// 处理引入标签的数据
+    let headTags = [];
+    let bodyTags = [];
+    data.headTags.forEach(headTag => {
+      headTags.push(this.progressTage(headTag,compilation));
+    });
+    data.bodyTags.forEach(bodyTag => {
+      bodyTags.push(this.progressTage(bodyTag,compilation));
+    });
+    return {...data, headTags, bodyTags}
+  }
+  apply(compiler){
+    // 要通过webpackPlugin来实现这个功能
+    compiler.hooks.compilation.tap('MyPlugin',(compilation)=>{
+      HtmlWebpackPlugin.getHooks(compilation).alterAssetTagGroups.tapAsync
+      ('alterPlugin',(data,cb)=>{
+        data = this.progressTages(data);
+        cb(null,data)
+      })     
+    })
+  }
+}
 ```

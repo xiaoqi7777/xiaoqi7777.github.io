@@ -1,5 +1,5 @@
 # node
-
+[[toc]]
 ## fs(有Sync是同步  无是异步) 
 **1、fs.access('文件名字') 判断文件是否存在**
 
@@ -94,6 +94,9 @@ function copy(src,target){
 **5、path.basename('1.min.js','.js')     输出1.min(通过后缀 找文件路径)**
 
 **6、path.relative 从绝对路径里面找相对路径**
+
+**7、path.dirname 找父路径  path.dirname('./src/a.js') =>./src **
+
 ```js
 // 当前在c:/index/a/b/c 知道c:/index  获取/a/b/c
 let c = path.relative(c:/index,c:/index/a/b/c)
@@ -375,11 +378,69 @@ http.createServer(function (req,res) {
   console.log('3000端口启动了')
 });
 ```
+## 后端接受的数据
+- 主要有3大类，第一个json，第二个form表单，第三个file类型
+- 每个数据格式都有对应的请求头
+- json => "Content-Type":"application/json"
+- form => "Content-Type":"application/x-www-urlencoded"
+- file => 在html的form表单中 必须添加`enctype="multipart/form-data"`
+- express 接受后端数据，主要是post提交(包含以上三种类型)
+```js
+let express = require('express');
+let bodyParser = require('body-parser');
+let multer = require('multer')
+let fs =require('fs')
+let path = require('path')
+let app = express();
+// 处理json格式的请求体
+app.use(bodyParser.json());
+// 处理表单格式的请求体
+app.use(bodyParser.urlencoded({extended:true}));
+// 文件上传 upload req.file获取文件的流   dest req.file 获取的保存路径
+let upload = multer({upload:'upload/'})
+// var storage = multer.diskStorage({
+//   destination: function (req, file, cb) {
+//     cb(null,path.join(__dirname,'/upload'))
+//   },
+//   filename: function (req, file, cb) {
+//     cb(null, Date.now() + "-" + file.originalname)
+//   }
+// })
+// let upload = multer({storage:storage})
+
+app.post('/post',(req,res)=>{
+  let body = req.body
+  console.log(body)
+  res.send(body)
+})
+app.post('/form',(req,res)=>{
+  let body = req.body
+  res.send(body)
+})
+// 只有一个文件类型的用upload.single('avatar') 处理
+app.post('/upload',upload.single('avatar'),(req,res)=>{
+  // req.file 里面存放的文件类型的数据
+  // req.body 里面存放的普通类型的数据
+  console.log(req.body.name,typeof req.body)
+  console.log(req.file); //req.filr 指的是请求体formData里的avatar 字段对应的文件内容
+  // console.log(req.file.buffer); //req.filr 指的是请求体formData里的avatar 字段对应的文件内容
+  if(req.file){
+    fs.writeFileSync(path.join(__dirname,`upload/${req.file.originalname}`),req.file.buffer)
+  }
+  
+  res.send(req.body)
+})
+app.listen(4000)
+```
+### 客户端
 
 ## 常用的库
 
 **1、let mime = require('mime')**
-
+```js
+// 获取文件的后缀
+  mime.getType('引入文件')
+```
 **2、let fs = require('mz/fs')**
 
 mz需要引入 mz将fs所有的方法转换成promise

@@ -143,7 +143,7 @@ server {
     location ~ .*\.(jpg|png|gif)$ {
         gzip off;
         gzip_http_version 1.1;
-        gzip_comp_level 3;
+        gzip_comp_level 3; 
         gzip_types image/jpeg image/png image/gif;
         expires 24h;
         root /data/images;

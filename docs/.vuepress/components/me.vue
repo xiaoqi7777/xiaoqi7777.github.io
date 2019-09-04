@@ -4,25 +4,12 @@
     <section class='block'>
       <div class='left'>
           <img src="../public/img/1.jpg" alt="">
-          <p>北麒</p>
+          <p>NorthUnicorn</p>
       </div>
       <ul class="right">
          <li>name：{{name}}</li>
          <li>company：{{company}}</li> 
          <li>Occupation：{{Occupation}}</li> 
-         <li>contact：{{contact}}</li> 
-      </ul>
-    </section>
-    <section class='block'>
-      <div class='left'>
-          <img src="../public/img/1.jpg" alt="">
-          <p>北麒</p>
-      </div>
-      <ul class="right">
-         <li>name：{{name}}</li>
-         <li>company：{{company}}</li> 
-         <li>Occupation：{{Occupation}}</li> 
-         <li>contact：{{contact}}</li> 
       </ul>
     </section>
   </div>

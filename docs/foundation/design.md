@@ -146,3 +146,139 @@ class Animal {
 	let d=new Dog('zfpx',10,10);
 	d.speak();
 ```
+## 发布订阅模式
+
+## 观察者模式
+
+<img :src="$withBase('/img/observe.png')" >
+
+- 被观察者提供维护观察者的一系列方法
+- 观察者提供更新接口
+- 观察者把自己注册到被观察者里面
+- 在被观察者发生变化的时候,调用观察者的更新方法
+
+### 伪代码(讲述明星和粉丝的故事)
+
+```js
+// 被观察者
+class Star{
+  constructor(name){
+    this.name = name;
+    this.state = '';
+    // 被观察者 内部维护一个 观察者数组
+    this.observers = [];//粉丝
+  }
+  getState(){
+    return this.state
+  }
+  setState(state){ 
+    this.state = state;
+    this.notifyAllObservers()
+  }
+  // 增加一个新的观察者
+  attach(observer){
+    this.observers.push(observer)
+  }
+  // 通知所有的观察者更新自己
+  notifyAllObservers(){
+    if(this.observers){
+      this.observers.forEach(observer=>observer.update())
+    }
+  }
+}
+// 观察者
+class Fan{
+  constructor(name,start){
+    this.name = name;
+    this.start = start
+    // 通过start里的方法 把自己注入到start的observers里面
+    this.start.attach(this);
+  }
+  update(){
+    console.log(`当前颜色是 => ${this.start.getState()}`);
+  }
+}
+
+let star = new Star('Angular Baby')
+let f1 = new Fan('张三',star)
+let f2 = new Fan('李四',star)
+star.setState('绿色')
+```
+### 场景
+- promsie then的时候
+  - new Pormise() 的时候 会执行里面的函数,将值保存起来。等到then的时候之前的结果返回
+- vue 和 react里生命周期,只有等到运行 这儿时期的时候(触发当前生命周期) 才会去调用
+- node events对象里的 on 和 emit
+
+## 发布订阅
+
+<img :src="$withBase('/img/publish.png')" >
+
+- 订阅者把自己想订阅的事件注册到调度中心
+- 当该事件触发的时候,发布者发布该事件到调度中心,由调度中心统一调度订阅者注册事件的处理代码
+
+### 伪代码(房东和租客的故事)
+```js
+class Agent{
+  constructor(){
+    this._events = {}
+  }
+  // on
+  subscribe(type,listener){
+    let listeners = this._events[type]
+    if(listeners){
+      listeners.push(listener)
+    }else{
+      this._events[type] = [listener]
+    }
+  }
+  // emit 
+  publish(type){
+    let listeners = this._events[type]
+    let args = Array.prototype.slice.call(arguments,1)
+    if(listeners){
+      listeners.forEach(listener=>listener(...args))
+    }
+  }
+}
+// 房东
+class LandLord{
+  constructor(name){
+    this.name = name
+  }
+  // 向外出租
+  lend(agent,area,money){
+    agent.publish('house',area,money)
+  }
+}
+// 租客
+class Tenant{
+  constructor(name){
+    this.name = name
+  }
+  rent(agent){
+    agent.subscribe('house',(area,money)=>{
+      console.log(`${this.name}看到中介的新房源${area},${money}`)
+    })
+  }
+}
+
+let agent = new Agent();
+let t1 = new Tenant('张三');
+let t2 = new Tenant('李四');
+t1.rent (agent)
+t2.rent (agent)
+let landLord = new LandLord();
+landLord.lend(agent,60,400)
+
+```
+### 场景
+- mvvm使用
+<img :src="$withBase('/img/mvvm.png')" >
+
+
+## 发布订阅&&观察者(区别)
+<img :src="$withBase('/img/o_p.png')" >
+- 1、角色不一样，发布订阅(3者，发布者&&订阅者&&调度中心)，观察者(2者，观察者&&被观察者)
+- 2、观察者&&被观察者存在依赖，发布订阅则是解耦
+- 3、调度人不同，观察者模式是由被观察者调度，发布订阅是由调度中心调度
