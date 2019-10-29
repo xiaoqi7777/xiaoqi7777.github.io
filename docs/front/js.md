@@ -138,6 +138,56 @@ for (item in f){
 - 2、执行构造函数,将this指向这个新的对象
 - 3、判断执行完的结果是对象 即返回 否则返回新对象
 
+- new一个函数 和执行一个函数 返回同一个的对象
+  - 在构造函数 给一个返回对象
+```js
+function Fn(){
+  let xx = {name:'1'}
+  return xx
+}
+let r1 = Fn()
+let r2 = new Fn()
+r1 === r2
+```
+
+### 构造函数的2种用法&&setProtorypeOf 
+- 修改对象原型的属性，Object.setPrototypeOf(Object,proto)
+- Object.prototype 指向 proto 对象
+```js
+function Fn(){
+  this.name = 'sg'
+}
+let proto = {
+  url :'xxxxxxxxx'
+}
+Fn.prototype.address = '北京'
+let one = new Fn()
+let two = new Fn()
+Object.setPrototypeOf(one,proto)
+console.log(one.address) // undefined
+console.log(one.url)  // xxxxxxxxx
+console.log(two.address) // 北京
+```
+- 构造函数 2种用法
+```js
+function Fn(){
+  function route(){}
+  Object.setPrototypeOf(route,proto)
+  return route
+}
+let proto = Object.create()
+proto.a1 = ()=>'a1'
+proto.a2 = 'a2'
+
+// 用法一
+let rs = new Fn()
+console.log(rs.a1())
+console.log(rs.a2)
+// 用法二
+console.log(Fn().a1())
+console.log(Fn().a2)
+```
+
 ### this
 - this要在执行时才能确认值,定义时无法确认
 ```js
@@ -169,7 +219,7 @@ fn.apply({x:100},['zhangsan',20])
 Function.prototype.myCall = function(context,...args){
   context = context ? Object(context) : window;
   context.fn = this;
-  if(!args){
+  if(!args){ 
     return context.fn()
   }
   // 利用toString 的特性
@@ -389,7 +439,7 @@ Math.round(Math.random()*x)
     Arr.filter((item,index)=>{ //(----------------原数组不变动)
       //通过某一个条件过滤数组
       if(item>=2){
-        return true
+        return true 
       }
     })
     //原数组不变，返回满足条件的元素
@@ -1251,7 +1301,7 @@ function co(it){
 .  任意一个字符
 \. 真正的点
 */
-```
+``` 
 ### 分组和子项
   - 子项 => ()
 ### 中括号
@@ -1264,8 +1314,17 @@ function co(it){
   -  [\u4e00-\u9fa5] 中文的区间,包含所有的汉字
   - red|blue|green 标示red,blue,green 这三个单词中的任何一个(至少)
 
+### 属性
+  - global 布尔值,表示是否设置了g标志
+  - ignoreCase 布尔值,表示是否设置了i标志
+  - lastIndex 整数,表示开始搜索下一个匹配项的字符位置,从0开始(带g才有效果 不然每次都是从头开始)
+  - multiline 布尔值 表示是否设置了m表示
+  - source 正则表达式的字符串表示
+  - $n n代表()内匹配数据
+
 ### 量词
   - 所有的量词都需要放在{n,m}里面
+  - \n n代表数字 \n代表第几个的分组=>()
   - n,m代表数字
   - {n}     前一项重复n次
   - {n,}    前一项至少重复n次，最多不限
@@ -1281,6 +1340,26 @@ function co(it){
     - 是否包含某位字符串
     - 正则对象.test(字符串)
     - 返回:布尔值
+  - exec 接收一个字符串参数 返回匹配的内容，或者没有匹配项情况下返回null
+    - 返回的是array实例,记住不能随便加空格,没有捕获组则该数组只包含一项,捕获组就是中括号
+    - index 表示匹配项在字符串中的位置
+    - input 正则表达式的字符串
+      - let text = "mom and dad and bady"
+      - var p = /mom( and dad (and bady)?)?/gi
+      - var p1 = /nd/gi
+      - var ma = p.exec(text)
+      - 若是不加g他每次只返回一个匹配项,每次调用exec则都会在字符串中继续查- 找新的匹配项索引的第一个就是匹配到的值
+      - 若正则匹配项里面加()(即捕获组)则匹配所有满足的  如果带g他的index会有变化
+  - toString方法 
+    - RegExp 和 字面量创建的 toString方法都返回正则表达式的字面量
+  - valueOf 返回正则表达式的本身 是一个对象
+### RegExp静态方法
+  - $$  $
+  - $&  匹配模式的子字符串 与RegExp.lastMatch 的值相同 (lastMatch 最后匹配的值) 你不能使用属性访问器(RegExp.$&)来使用简写的别名，因为解析器在这里会将 "&" 看做表达式，并抛出 SyntaxError 。使用 方括号符号来访问属性。
+  - $n   匹配第n个捕获组的子字符串 n(0-9),如果正则表达式没有定义捕获组 则使用空字符串
+  - $nn  匹配第nn个捕获组的子字符串 nn(00-99)
+
+### 字符串方法 用正则
   - search()
     - 找匹配的字符串首次出现的位子
     - 字符串.search(字符串或者正则)
@@ -1296,6 +1375,7 @@ function co(it){
     - 字符串.replace(字符串或者正则,字符串或者函数)
     - 返回:替换后的新字符串,原来的字符串没有变化
 ```js
+
 // 参数 
 // 第一个参数:字符串或者正则
 // 第二个参数:字符串或者函数

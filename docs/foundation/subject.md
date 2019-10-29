@@ -58,6 +58,10 @@ function fn(rs){
 fn([{"51":1},{"51":2},{"37":1},{"37":2},{"37":3}])
 ```
 ### apply call bind原理
+- apply和call 基本一样 apply接收的是数组，call接收的是每一个参数，传递进去的都是一个一个的参数
+- eval(`xxx `) 语法会直接执行字符串里面的代码
+- `${[1,2]}` == '1,2'  ,`${}` 能将数组转换成字符串 
+- a = (1,2,n)  =>  a===n 
 ```js
 function fn (a,b,c,d){
   console.log('=>',a,b,c,d)
@@ -71,6 +75,7 @@ Function.prototype.mycall = function(context,...args){
   if(!args){
     context.fn()
   }
+  // `${args}` 会把数组转换成string 隐式转换 
   let rs = eval(`context.fn(${args})`)
   delete context.fn;
   return rs
@@ -78,7 +83,7 @@ Function.prototype.mycall = function(context,...args){
 
 fn.mycall({x:1000},1,2,3,4,5)
 
-Function.prototype.myAplly = function(context,args){
+Function.prototype.myApply = function(context,args){
   context = Object(context)?context:window;
   context.fn = this
   if(!args){
@@ -89,7 +94,7 @@ Function.prototype.myAplly = function(context,args){
   return rs
 }
 
-fn.mycall({x:1000},[1,2,3,4,5])
+fn.myApply({x:1000},[1,2,3,4,5])
 
 Function.prototype.myBind = function(context){
   let bindArgs = Array.prototype.slice.call(arguments,1)

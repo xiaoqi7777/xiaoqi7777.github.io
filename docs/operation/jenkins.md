@@ -20,7 +20,7 @@ su - git
 mkdir -p ~/repos/app.git
 cd ~/repos/app.git
 git --bare init
-```
+``` 
 
 ### 创建git客户端
 ```js

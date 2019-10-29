@@ -60,5 +60,8 @@
     全局配置邮箱
       git config --global user.email "eamil@qq.com"
 
+    merge :refusing to merge unrelated histories
+    加上--allow-unrelated-histories
+
 
 ```

@@ -452,3 +452,11 @@ let str = 'username#=123&@password#=456'
 let obj = require('querystring').parse(str,'&@','#=')
 console.log(obj)//{ username: '123', password: '456' }
 ```
+**4、方法拷贝**
+- 把一个对象的属性 拷贝到另一个对象上去
+- express 源码用到这个
+```js
+var mixin = require('merge-descriptors');
+mixin(app, EventEmitter.prototype, false);
+mixin(app, proto, false);
+```
