@@ -48,7 +48,8 @@ module.exports = {
           "routerAuth",
           "statusCode",
           "koa_express",
-          "useLibrary"
+          "useLibrary",
+          "reg"
         ]
       }],
       "/front/": [{

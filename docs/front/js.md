@@ -322,7 +322,7 @@ dt.getSeconds() // 秒(0-59)
 ```
 - 获取2017-xx-xx格式的日期
 ```js
-function formatData(dt){
+function formatDate(dt){
   if(!dt){
     dt = new Date()
   }
