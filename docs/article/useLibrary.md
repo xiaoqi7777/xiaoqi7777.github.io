@@ -47,3 +47,6 @@ let rs = url.parse('http://user:pass@host.com:8080/p/a/t/h?query=string#hash', t
 ```
 **6、fiddler**
 - https://blog.csdn.net/cui130/article/details/80595435
+
+**7、querystring**
+ - [https://www.jianshu.com/p/78c94673a2e8](https://www.jianshu.com/p/78c94673a2e8)

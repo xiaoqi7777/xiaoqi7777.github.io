@@ -368,7 +368,7 @@ Router.prototype._route = function(path) {
   // 每一个请求路径 都对应一个layer 
   // layer 第二个参数就是路由里面 对应的执行函数,每个路由对应的执行函数数量都不固定，所有通过route.dispatch去循环执行里面的所有函数
   let layer = new Layer(path, route.dispatch.bind(route))
-  layer.route = route
+  layer.router = route
   // 当前layout层结构  就是的 path和一堆处理函数
   this.statck.push(layer)
   return route
@@ -397,9 +397,9 @@ Router.prototype.handle = function(req, res, out) {
     }
     let layer = self.statck[index++]
     // 判断路径 layer.match(pathname) 请求的path 和 layer里面存的path 一样
-    // 判断方法 layer.route.handler_method 
+    // 判断方法 layer.router.handler_method 
     // 当方法和路径同匹配上的时候  就执行当前的路由
-    if (layer.match(pathname) && layer.route && layer.route.handler_method(req.method)) {
+    if (layer.match(pathname) && layer.router && layer.router.handler_method(req.method)) {
       layer.handler_request(req, res, next)
     } else {
       // 当上一层执行完成 就走下一层router
@@ -531,7 +531,7 @@ proto.use = ()=>{}
 proto.get = ()=>{}
 proto.handle = ()=>{}
 ```
-- 收集use 同样创建Layer 实例将他存放到 statck里面 和 router一样,用layer.route 来区别中间件和路由,中间件 是没有route 所有给undefined
+- 收集use 同样创建Layer 实例将他存放到 statck里面 和 router一样,用layer.router 来区别中间件和路由,中间件 是没有route 所有给undefined
 ```js
 proto.use = function(path, handler) {
   if (typeof handler != 'function') {
@@ -539,12 +539,12 @@ proto.use = function(path, handler) {
     path = '/'
   }
   let layer = new Layer(path, handler)
-  layer.route = undefined; // 我们正是通过layer有没有route来判断是中间件 还是路由
+  layer.router = undefined; // 我们正是通过layer有没有route来判断是中间件 还是路由
   this.statck.push(layer);
 }
 ```
 
-- 处理use 当匹配到当前层的时候  用`layer.route`判断是路由层还是中间层,上面说过 中间件的router都是undefined 
+- 处理use 当匹配到当前层的时候  用`layer.router`判断是路由层还是中间层,上面说过 中间件的router都是undefined 
 - 这里要对路径做处理,如果中间件有多层路径的时候 例如`app.use('/user', user)`。用`req.url = req.url.slice(removed.length)`重新截取url 在执行
 - 截取之后,再次执行的时候 req.url 是缺失的 所以需要在次添加。`if(removed.length > 0)`这个条件就是中间件再次执行的时候 进入，将url给添加上
 ```js
@@ -567,7 +567,7 @@ proto.handle = function(req, res, out) {
     let layer = self.statck[index++]
     // 当前一层router
     if (layer.match(pathname)) {
-      if (!layer.route) { //这一层是中间件层
+      if (!layer.router) { //这一层是中间件层
         removed = layer.path;
         req.url = req.url.slice(removed.length)
         if (err) {
@@ -577,7 +577,7 @@ proto.handle = function(req, res, out) {
         }
       } else {
         // 是路由
-        if (layer.route && layer.route.handler_method(req.method)) {
+        if (layer.router && layer.router.handler_method(req.method)) {
           layer.handler_request(req, res, next)
         } else {
           // 下一层router
@@ -590,4 +590,502 @@ proto.handle = function(req, res, out) {
   }
   next()
 }
+``` 
+### 路径参数
+- 作用
+  - 1、配置的路由是`app.get('/user/:uid/:name',function(){})`,当请求`localhosst://user/1/sg`的时候 uid和name能匹配到1和sg
+  - 2、批量处理路径参数 
+  
+```js
+  app.param('name', function(req, res, next, val, name) {
+    req.user = { id: 1, name: 'zfpx' }
+    next()
+  })
+  app.param('name', function(req, res, next, val, name) {
+    req.user.name = 'zfpx2'
+    next()
+  })
 ```
+- 用法
+```js
+let express = require('../express/express')
+const app = express()
+
+// 用来批量处理路径参数 
+app.param('name', function(req, res, next, val, name) {
+  req.user = { id: 1, name: 'zfpx' }
+  next()
+})
+app.param('name', function(req, res, next, val, name) {
+  req.user.name = 'zfpx2'
+  next()
+})
+// 路径参数 因为参数在路径里面
+app.get('/user/:uid/:name', function(req, res) {
+  console.log(req.params) // 路径参数对象
+  console.log(req.user)
+  res.end('user')
+})
+
+app.listen(3000)
+```
+- 他有2个功能 第一个是匹配路径 第二个是批量处理路径参数
+- 匹配路径 在`route/index`的时候判断`layer.match(pathname)`请求的url是否与layer里面存这的url匹配。match 匹配的时候通过`this.router` 来识别 是正常的路径还是use。`pathToRegexp`用来解析路由的(下面有方法原理)。`this.reg.exec(url)`获取的是所有配置分组项,也就是说有动态路径的时候才会返回true。同时还路径参数和对进行匹配 存放到`this.params`中。
+- layer.js
+```js
+let pathToRegexp = require('path-to-regexp')
+function Layer(path, handler) {
+  this.path = path
+  this.handler = handler
+  // 存放 动态路径 匹配的值
+  this.keys = []
+  this.reg = pathToRegexp(this.path, this.keys)
+}
+Layer.prototype.match = function(url) {
+  // 路由
+  if (this.path == url) {
+    return this.path == url
+  }
+  // 路径参数
+  if (this.router) {
+    this.params = {}
+    let matchRs = this.reg.exec(url)
+    if (matchRs) {
+      for (let i = 1; i < matchRs.length; i++) {
+        let key = this.keys[i - 1].name
+        this.params[key] = matchRs[i]
+      }
+      return true
+    }
+  }
+  // 中间件
+  if (!this.router) {
+    return url.startsWith(this.path)
+  }
+}
+Layer.prototype.handler_request = function(req, res, next) {
+  this.handler(req, res, next, 'n2')
+}
+Layer.prototype.handlerErr_request = function(err, req, res, done) {
+
+  if (this.handler.lengtg == 4) {
+    return done(err)
+  }
+  this.handler(err, req, res, done)
+
+}
+module.exports = Layer
+```
+- 批量处理路径参数
+  - 第一步 先保存`proto.param`传递进来的函数，将相同name的保存到同一个数组中
+  - 第二步 在路径匹配 执行回调函数的时候 进行拦截处理
+  - 第三步 就是执行`process_params`函数,也就是处理之前保存的paramCallbacks数组中的数据,最后在执行上面的回调函数
+```js
+// proto.param 将所有的类路径参数 全部保存起来,相同的 全部存到同一个数组中 
+proto.param = function(name, cb) {
+  if (!this.paramCallbacks[name]) {
+    this.paramCallbacks[name] = []
+  }
+  this.paramCallbacks[name].push(cb)
+}
+
+
+// 处理
+proto.handle = function(req, res, done, a1) {
+// ..... 
+// 当路径匹配到，执行回来的时候 用 self.process_params方法对回调做拦截 
+if (layer.router && layer.router.handle_method(req.method)) {
+    req.params = layer.params
+    self.process_params(layer, req, res, function() {
+      layer.handler_request(req, res, next)
+    })
+  } else {
+    next(err)
+  }
+// .....
+}
+
+
+proto.process_params = function(layer, req, res, done) {
+  let paramCallbacks = this.paramCallbacks
+  // layer.keys保存着所有的动态路由
+  let keys = layer.keys
+  // 当keys 没有的时候 直接返回
+  if (!keys && keys.length == 0) {
+    done()
+  }
+
+  let keyIndex = 0;
+  let key = null;
+  let name = null;
+  let cbs = null;
+  let val = null;
+
+  function param() {
+    if (keyIndex == keys.length) {
+      return done()
+    }
+    key = keys[keyIndex++]
+    name = key.name
+    //  paramCallbacks[name] 存放的是多个情况
+    cbs = paramCallbacks[name]
+    val = req.params[name]
+    if (!val || !cbs.length == 0) {
+      return done()
+    }
+    execCallback()
+  }
+  let cbIndex = 0
+
+  function execCallback() {
+    let cb = cbs[cbIndex++]
+    if (!cb) {
+      return param()
+    }
+    cb(req, res, execCallback, val, name)
+  }
+  param()
+}
+```
+-  里面用到一个库 `pathToRegexp` 专门用来解析路由匹配的,给他传递一个url(路径)和keys(空的数组),他返回匹配的正则,同时将路径参数寸放到keys中
+```js
+let path = '/user/:uid/:name';
+let keys = []
+
+function pathToRegexp(path, keys) {
+  return path.replace(/\:([^\/]+)/g, ($1, $2, $3) => {
+    keys.push({
+      name: $2,
+      replace: false
+    })
+    return '\:([^\/]+)'
+  })
+}
+
+let rs = pathToRegexp(path, keys)
+let str = '/user/123/weqw'
+let a = rs.exec(str)
+console.log(keys)
+```
+
+### 模板引擎
+- 将数据和模板进行渲染
+- 用法
+```js
+let express = require('../express/express')
+const path = require('path')
+const ejs = require('../express/html.js')
+const app = express()
+const fs = require('fs')
+let url = require('url')
+
+// views是用来设置模板存放根目录
+app.set('views', path.resolve(__dirname, 'views'))
+// 设置模板引擎 如果render没有指定模板后台名 会以这个作为后缀名
+app.set('view engine', 'html')
+
+// 用来设置模板引擎,遇到html结尾的模板用html来进行渲染
+app.engine('html', ejs)
+
+
+app.use(function(req, res, next) {
+  res.render = function(name, options) {
+    // 模板后缀
+    let ext = '.' + app.get('view engine')
+    // 模板文件的名字
+    name = name.indexOf('.') == -1 ? name + ext : name
+    // 模板位子
+    let filepath = path.join(app.get('views'), name)
+    // 通过模板后缀 获取对应的渲染引擎
+    let render = app.engines[ext]
+    function done(err, rs) {
+      res.setHeader('Content-Type', 'text/html')
+      res.end(rs)
+    }
+    render(filepath, options, done)
+  }
+  next()
+})
+
+// 当客户端以get方式访问/路径的时候执行对应的回调函数
+app.get('/', function(req, res, next) {
+  // render 第一个参数是模板的相对路径 模板名称 数据对象
+  res.render('index', { title: 'helloxx', user: { name: 'zfxp' } })
+})
+
+app.listen(3000)
+```
+## express 插件
+### body-parser 
+- 里面包含了req.body的实现 他就是 将获取的数据解析成
+```js
+function bodyParser () {
+    return function (req,res,next) {
+        var result = '';
+        req.on('data', function (data) {
+            result+=data;
+        });
+        req.on('end', function () {
+            try{
+                req.body = JSON.parse(result);
+            }catch(e){
+                req.body = require('querystring').parse(result);
+            }
+            next();
+        })
+    }
+};
+```
+
+### 触发 options 条件
+- options 发送的不是get和post 并且带请求头的话  会先发一个options请求,来确认能不能访问 在发送
+- 使用了PUT、DELETE、CONNECT、OPTIONS、TRACE、PATCH方法
+- 人为设置了非规定内的其他首部字段，如果Content-Type设置text/plain无效
+
+### cors 跨域 && http常用请求头
+- `Access-Control-Allow-Origin`:`*` 当设置*的时候 cookie 会有问题
+- `Access-Control-Allow-Headers`:`xx` 允许携带的请求头
+- `Access-Control-Allow-Methods`:`PUT,POST` 允许那些请求方式 (post和get是默认)
+- `Access-Control-Allow-Credentials`:true 允许携带凭证(cookies)
+- `Access-Control-Expoes-Headers`:`` 允许获取请求头
+- `Access-Control-Max-Age`:`10` 允许预检存活的时间 10s内 options 请求只会发一次
+
+```js
+function cors() {
+  return function(req, res, next) {
+    res.setHeader('Access-Control-Allow-Origin', "*")
+    //允许携带哪个头访问我
+    res.setHeader('Access-Control-Allow-Headers', 'name')
+    //允许哪个方法访问我 默认post get
+    res.setHeader('Access-Control-Allow-Methods', 'PUT')
+    //允许携带cookie  但是Access-Control-Allow-Origin 不能设置 * 其他都可以
+    res.setHeader('Access-Control-Allow-Credentials', true)
+    //允许前端获取哪个头
+    res.setHeader('Access-Control-Expose-Headers', 'name,ss')
+    //预检的存活时间 10s内 options请求只会发一次  
+    res.setHeader('Access-Control-Max-Age', 10)
+    if (req.method.toLowerCase() == 'options') {
+      res.end()
+    }
+    next()
+  }
+}
+```
+### post 三种提交方式
+- json
+- 请求头 `('Content-Type', 'application/json')`
+  - request和axios一样都是用来发送请求数据
+- 后端用 body-parser 接收即可
+```html
+<!-- js版本发送 -->
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+  <div>112</div>
+  <script>
+    let ajax = new XMLHttpRequest()
+    ajax.open('post', 'http://localhost:3001/post', true)
+    ajax.setRequestHeader('Content-Type', 'application/json')
+    ajax.onreadystatechange = function() {
+      if (ajax.readyState == 4) {
+        if (ajax.status == 200) {
+          console.log(ajax.responseText)
+        }
+      }
+    }
+    let data = { "data": "xxx" }
+    data = JSON.stringify(data)
+    ajax.send(data)
+  </script>
+</body>
+</html>
+<!-- node版本 -->
+<script>
+let request = require('request')
+let options = {
+  url: 'http://localhost:3001/post', //路径
+  method: 'POST', //请求方式
+  json: true, //希望返回的数据格式 是json格式
+  headers: { //请求头
+    "Content-Type": "application/json"
+  },
+  body: {
+    name: 'sg',
+    age: 18
+  }
+}
+
+request(options, function(err, response, body) {
+  console.log('err', err)
+  console.log('status', response.statusCode)
+  console.log('success', body)
+})
+</script>
+```
+- 表单格式 
+- 请求头`('Content-Type','application/x-www-urlencoded')`
+- html表单提交的时候 不涉及跨域  因为不需要返回值
+```html
+<!DOCTYPE html>
+<html lang="en">
+<body>
+  <form method="POST" action="http://localhost:3001/form">
+    <input type="text" name='name'>
+    <input type="text" name='age'>
+    <input type="submit" value="提交">
+  </form>
+</body>
+</html>
+
+<script>
+let request = require('request')
+let options = {
+  url: 'http://localhost:3001/form', //路径
+  method: 'POST', //请求方式
+  json: true, //希望返回的数据格式 是json格式
+  headers: { //请求头
+    "Content-Type": "application/x-www-urlencoded"
+  },
+  form: {
+    name: 'sg',
+    age: 18
+  }
+}
+// 表单用form 类似body
+request(options, function(err, response, body) {
+  console.log('err', err)
+  console.log('status', response.statusCode)
+  console.log('success', body)
+})
+</script>
+```
+
+- file
+- `enctype='multipart/form-data'`
+```html
+<!DOCTYPE html>
+<html lang="en">
+<body>
+  <!-- 图片必须加 enctype="multipart/form-data" -->
+  <!-- 最终提交的和3file.js文件中的formData 格式一样 -->
+  <form enctype="multipart/form-data" action="http://localhost:3001/upload" method="POST">
+    <input type="text" name="name">
+    <input type="file" name="avatar">
+    <input type="submit" value="提交">
+  </form>
+</body>
+</html>
+
+<script>
+let request = require('request')
+const fs = require('fs')
+let path = require('path')
+let url = 'http://localhost:3001/upload'
+let formData = {
+  name: 'sg',
+  avatar: { //文件类型
+    value: fs.createReadStream(path.join(__dirname, 'baidu.png')), // 这是一个可读流,存放头像的内容
+    options: {
+      filename: 'baidu.png',
+      contentType: 'image/png'
+    }
+  },
+}
+// url formData 格式都是写死的
+request.post({ url, formData }, function(err, response, body) {
+  console.log('err', err)
+  // console.log('status',response.statusCode)
+  console.log('success', body)
+})
+</script>
+```
+
+- server.js
+```js
+// bodyParser 和 req.body 实现
+let express = require('../express/express')
+const path = require('path')
+let multer = require('multer')
+const app = express()
+let url = require('url')
+let bodyParser = require('body-parser');
+let fs = require('fs')
+app.use(cors())
+// app.use(myBodyParser())
+// 接收 json 格式
+app.use(bodyParser.json())
+// 处理表单格式的请求体
+app.use(bodyParser.urlencoded({ extended: true }));
+// 文件上传 upload req.file获取文件的流   dest req.file 获取的保存路径
+let upload = multer({ upload: 'upload/' })
+app.post('/post', function(req, res, next) {
+  let str = req.body
+  console.log('str', req.body)
+  res.end('str')
+})
+app.post('/form', function(req, res, next) {
+  let str = req.body
+  console.log('form', req.body)
+  res.end('form')
+})
+// 只有一个文件类型的用upload.single('avatar') 处理
+app.post('/upload', upload.single('avatar'), (req, res) => {
+  // req.file 里面存放的文件类型的数据
+  // req.body 里面存放的普通类型的数据
+  console.log(req.body.name, typeof req.body)
+  console.log(req.file); //req.filr 指的是请求体formData里的avatar 字段对应的文件内容
+  // console.log(req.file.buffer); //req.filr 指的是请求体formData里的avatar 字段对应的文件内容
+  if (req.file) {
+    // 将图片写入本地
+    fs.writeFileSync(path.join(__dirname, `upload/${req.file.originalname}`), req.file.buffer)
+  }
+
+  res.end('file')
+})
+app.listen(3001)
+
+
+// //  用来接收 post 参数
+function myBodyParser() {
+  return function(req, res, next) {
+    let rs = []
+    req.on('data', function(data) {
+      rs += data
+    })
+    req.on('end', function(data) {
+      try {
+        req.body = JSON.parse(rs)
+        console.log('11', req.body)
+      } catch (e) {
+        req.body = require('querystring').parse(rs)
+        console.log('22', req.body)
+      }
+      next()
+    })
+  }
+};
+
+function cors() {
+  return function(req, res, next) {
+    res.setHeader('Access-Control-Allow-Origin', "*")
+    //允许携带哪个头访问我
+    res.setHeader('Access-Control-Allow-Headers', 'Content-type,Content-type1')
+    //允许哪个方法访问我 默认post get
+    res.setHeader('Access-Control-Allow-Methods', 'PUT')
+    //允许携带cookie  但是Access-Control-Allow-Origin 不能设置 * 其他都可以
+    res.setHeader('Access-Control-Allow-Credentials', true)
+    //允许前端获取哪个头
+    res.setHeader('Access-Control-Expose-Headers', 'name,ss')
+    //预检的存活时间 10s内 options请求只会发一次  
+    res.setHeader('Access-Control-Max-Age', 1)
+    if (req.method.toLowerCase() == 'options') {
+      console.log('12312', req.method.toLowerCase())
+      res.end()
+    }
+    next()
+  }
+}
+```
+
+## [expres中间件资源](https://cnodejs.org/topic/545720506537f4d52c414d87)

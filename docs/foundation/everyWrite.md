@@ -288,12 +288,122 @@ let rs = [...arr1].filter(item => arr2.has(item))
 console.log(rs)
 ```
 
+## 路由 路径参数解析
+- 请求的路径 url=`/url1/123/sg`
+- 自定义的路由 reg = `url1/:id/:name`
+- 得到 => {id:123,name:sg}
+- exec 匹配的结果 和 分组 都放到数组内 长度就是数组长度,此外数组内还有文本下标 不记在length内
+  - 所以在数组内只有 结果和 分组
+```js
+let url = `/url1/123/sg/12312`
+let reg = `/url1/:id/:name/:l`
+let data = {}
+// 获取id name 放到keys中
+let keys = []
+
+function pathToRegexp(path, keys) {
+  let rs = path.replace(/\:([^\/]+)/g, function() {
+    keys.push(arguments[1])
+    return `([^\/]+)`
+  })
+  return new RegExp(rs)
+}
+let regexp = pathToRegexp(reg, keys)
+let matchRs = regexp.exec(url)
+for (let i = 1; i < matchRs.length; i++) {
+  let key = keys[i - 1]
+  data[key] = matchRs[i]
+}
+console.log(data, keys)
+```
+
+## 模板字符串
+- Function && with
+- new Function('参数',script), 参数可以写多个，script 是一个字符串,参数对应script里面的 参数
+```js
+  let obj = { s: 1 }
+  let script = `
+  console.log(obj,a)
+  `
+  let fn = new Function('obj', 'a', script)
+
+  fn(obj, 'a1' )
+  // 打印 {s:1} 'a1'
+```
+- with
+```js
+let obj = { a: 1 }
+with(obj) {
+  console.log(a) // 1
+}
+```
+- ejs
+- 单个渲染原理
+```js
+let str = `hello <%=name%> world <%=age%>`;
+let options = { name: 'zdpx', age: 9 }
+
+function render(str, options) {
+  return str.replace(/<%=(\w+)%>?/g, ($0, $1, $2, $3) => {
+    return options[$1]
+  })
+}
+
+let rs = render(str, options)
+console.log(rs)
+```
+- ejs if/for渲染原理
+- 主要用到2个语法 
+  - Function构造函数可以执行字符串脚本
+  - with(obj)语法 具有独立的作用域 里面的数据都可以从obj里面获取
+- render函数处理，
+  - head 主要是申明变量和创建with 语法
+  - str 是处理的模板,将<%xxx%> 和<%=xxx%>这两种替换出来,注意顺序,先处理<%=xxx%>类型的,他主要是处理 具体值 ,<%xxx%>是将if或者for语法进行转换
+  - tpl变量要将 除if 和 for以外的所有数据里连接起来,所以会有`"`;\n" + arguments[1] + "\n;tpl+=`"`,tpl是我们最终要获取的值
+  - html 获取的是str用正则替换和 with语法包装后的结果
+  - 最后通过Function函数将对象和html传进去 执行脚本
+
+```js
+let options = { user: { name: 'zdpx', age: 9 }, total: 5 }
+let str = `
+<%if(user){%>
+  hello '<%=user.name%>'
+<%}else{%>
+  hi guest
+<%}%>
+<ul>
+<%for(let i=0;i<total;i++){%>
+  <li><%=i%></li>
+<%}%>
+</ul>
+`
+
+function render(str, options) {
+  let head = "let tpl = ``;\n with(obj){ \n tpl+=` "
+  str = str.replace(/<%=([\s\S]+?)%>/g, function() {
+    return "${" + arguments[1] + "}"
+  })
+  str = str.replace(/<%([\s\S]+?)%>/g, function() {
+    return "`;\n" + arguments[1] + "\n;tpl+=`";
+  })
+  let tail = "`} \n return tpl;" 
+  let html = head + str + tail;
+  let fn = new Function('obj', html)
+  return fn(options)
+}
+
+
+let rs = render(str, options)
+console.log(rs)
+
+```
+
 ## 观察者模式
 - 被观察者(一个)  观察者(多个) 
 ```js
-1、被观察者提供维护观察者一系列方法
+1、被观察者提供维护观察者一系列方法 (注入观察者 提供更新数据 获取数据方法)
 2、观察者提供更新接口
-3、观察者把自己注入到被观察者中
+3、观察者把调用被观察者的注入方法自己注入到被观察者中
 4、当被观察者中的数据变化 调用观察者中的更新方法
 
 class Fan {
@@ -340,4 +450,51 @@ star.setState('black')
 ```js
 订阅者 发布者 调度中心
 订阅者把自己想订阅的事注册到调度中
+
+class Agent{
+  constructor(){
+    this._event = {}
+  }
+  publish(item){
+    let listeners = this._event[item]
+    let arg = Array.prototype.slice.call(arguments)
+
+    listeners.forEach(item=>item(...arg))
+  }
+  subsribe(type,listener){
+    let listeners = this._event[type]
+    if(listeners){
+      listeners.push(listener)
+    } else{
+      this._event[type] = [listener]
+    }
+  }
+}
+class Tenant{
+  constructor(name){
+    this.name = name
+  }
+  rent(agent){
+    agent.subsribe('house',(area,monry)=>{
+      console.log(this.name,area,monry)
+    })
+  }
+}
+class LandLord{
+  constructor(name){
+    this.name= name
+  }
+  lend(agent,area,monry){
+    agent.publish('house',area,monry)
+  }
+}
+
+let agent = new Agent()
+let landLord = new LandLord('房东')
+let tenant1 = new Tenant('张三')
+let tenant2 = new Tenant('李四')
+tenant1.rent(agent)
+tenant2.rent(agent)
+
+landLord.lend(agent,40,600)
 ```

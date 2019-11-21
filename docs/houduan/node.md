@@ -1,7 +1,8 @@
 # node
 [[toc]]
 ## fs(有Sync是同步  无是异步) 
-**1、fs.access('文件名字') 判断文件是否存在**
+**1、fs.access('文件夹名字') 判断文件夹是否存在   fs.existsSync(path) 判断文件是否存在**    
+
 
 **2、fs.readdir('m') 读取根文件下的 m文件下面的文件 返回一个数组 没有则是空数组**
 
@@ -446,6 +447,10 @@ app.listen(4000)
 mz需要引入 mz将fs所有的方法转换成promise
 
 **3、require('querystring').parse(str,'&@','#=')**
+- parse方法专门 对特定的字符串`例如:xx=111&name=sgh`处理和提取
+- 第一个参数是要处理的字符串,
+- 第二个参数是分隔符
+- 第三个是对象分隔符
 ```javaScript
 后面两个参数默认是 '&' '='
 let str = 'username#=123&@password#=456'

@@ -52,6 +52,7 @@
     - compress 开发服务器是否启动gzip等压缩
     -  port：开发服务器监听的端口
   - 在package.json 配置脚本
+  - --open 是启动后打开浏览器
   ```js
     "scripts": {
       "build": "webpack --mode development",

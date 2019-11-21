@@ -319,6 +319,10 @@ dt.getDate() // 日(0-31)
 dt.getHours() // 小时(0-23)
 dt.getMinutes() // 分钟(0-59)
 dt.getSeconds() // 秒(0-59)
+``` 
+- 求当月 有多少天
+```js
+  new Date(year,month,0).getDate()
 ```
 - 获取2017-xx-xx格式的日期
 ```js
@@ -1548,6 +1552,18 @@ true
 17
 ```
 - 上面的代码中，参数n从10变为0的过程中，even()一共会执行6次，所以变量counter等于6。第二次调用even()时，参数n从20变为0，even()一共会执行11次，加上前面的6次，所以变量counter等于17。
+### js 有三种作用域
+- 全局作用域
+- 函数作用域
+- with作用域
+```js
+    在with作用域里 变量名可以从obj的属性上取值
+    let obj = {name:'xxx'}
+    with(obj){
+      console.log('hello',name)//=>xxx
+    }
+```
+
 
 ## 页面加载
 - window.onload()
