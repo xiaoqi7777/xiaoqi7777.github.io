@@ -49,7 +49,8 @@ module.exports = {
           "statusCode",
           "koa_express",
           "useLibrary",
-          "reg"
+          "reg",
+          "deepWebpack"
         ]
       }],
       "/front/": [{

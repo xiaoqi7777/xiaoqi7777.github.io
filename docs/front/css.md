@@ -7,6 +7,8 @@
  
 
 - [viewport](https://www.cnblogs.com/2050/p/3877280.html )
+- [知乎自适应](https://www.zhihu.com/question/313971223/answer/628236155)
+
 - viewport 核心点
   - css中的px就可以看做是设备的独立像素
   - 物理像素(在不同的设备之间，每1个CSS像素所代表的物理像素是可以变化的,下面得公式,根据dpr计算)

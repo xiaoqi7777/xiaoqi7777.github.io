@@ -1,4 +1,4 @@
-# webpack
+# webpack(基础)
 [[toc]]
 
 ## base
@@ -113,10 +113,12 @@
   - mini-css-extract-plugin 将css单独提取出来 link自动引入
     - filename 打包入口文件
     - chunkFilename 用来打包import('module')方法中引入的模块
+    - 参考 js 异步加载 类似
   - style-loader 将文件引入(内连)
   - css-loader 的作用是处理css中的 @import 和 url 这样的外部资源
   - less-loader less/node-sass sass-loader 处理sass和less
   - `purgecss-webpack-plugin  glob`,一般与 glob、glob-all 配合使用, 必须和 mini-css-extract-plugin配合使用,可以去除未使用的 css
+    - 注意:使用的时候 一般是处理 js 里面的样式文件  html 模板里面的处理不了
   - postcss-loader autoprefixer 增加前缀   
     - 用法
     - 在处理css 里面增加一个`postcss-loader`处理器
@@ -164,6 +166,7 @@ let MiniCssExtractPlugin =  require('mini-css-extract-plugin')
 - rem2px `px2rem-loader lib-flexible`
   - 计算 font-size
   - 这个逻辑代码 尽量放到head 标签中 在页面绘制前加载
+  - remUnit 配置 代表页面 1rem 是多少 物理像素  通常将页面划分10个rem 所以这里一般是页面的宽度的十分之一
 ```js
 {
   test:/\.css/,
@@ -213,7 +216,14 @@ window.addEventListener('resize',setRemUnit)
     use:[
     {
       loader:'url-loader',
-      options:{limit:10*1024}
+      options:{
+        limit:10*1024,
+        // name 修改名字 可以处理路径
+        name:'img/[name].[hash].[ext]',
+        // outputPath 专门处理路径
+        outputPath: 'images',
+        publicPath:'../images'
+      }
     }
   ]
 }
@@ -225,7 +235,7 @@ window.addEventListener('resize',setRemUnit)
 }
 ```
 ### 压缩图片
-- `image-webpack-loader`可以帮助我们对图片进行压缩和优化
+- `image-webpack-loader`可以帮助我们对图片进行压缩和优化(image-webpack-loader windows下载有问题)
 ```js
 {
   test: /\.(png|svg|jpg|gif|jpeg|ico)$/,
@@ -238,22 +248,23 @@ window.addEventListener('resize',setRemUnit)
           progressive: true,
           quality: 65
         },
+        // optipng.enabled: false will disable optipng
         optipng: {
           enabled: false,
         },
         pngquant: {
-          quality: '65-90',
+          quality: [0.65, 0.90],
           speed: 4
         },
         gifsicle: {
           interlaced: false,
         },
+        // the webp option will enable WEBP
         webp: {
           quality: 75
         }
       }
     },
-  ]
 }
 ```
 
@@ -267,7 +278,7 @@ window.addEventListener('resize',setRemUnit)
         options:{//如果要加载的图片大小小于10K的话，就把这张图片转成base64编码内嵌到html网页中去
           limit:10*1024,
           outputPath: 'images',
-          publicPath:'/images'
+          publicPath:'../images'
        }
    }
  },
@@ -292,11 +303,13 @@ window.addEventListener('resize',setRemUnit)
 - 配置有两种写法 下面是options配置 还可以创建一个.babelrc文件 将options里的对象 复制过
 - `cnpm i -S @babel/plugin-transform-runtime @babel/runtime`  @babel/plugin-transform-runtime 是插件 他会依赖@babel/runtime
 - options 里面内容尽量放到 .babelrc文件 测试 不然会报错(测试)
-- eslint 处理代码校验 `cnpm i eslint eslint-loader babel-eslint -D`  配合vscode插件`eslint`保存自动处理代码
+- eslint 处理代码校验 `cnpm i eslint eslint-loader babel-eslint -D`  配合vscode插件`eslint`保存自动处理代码 
   - eslint 是核心库 eslint-loader loader作用 babel-eslint 转义高级语法
   - 创建配置文件 .eslintrc.js
   - [eslint-config-airbnb](https://github.com/airbnb/javascript/tree/master/packages/eslint-config-airbnb)
   - airbnb需要的 `cnpm i eslint-config-airbnb eslint-loader eslint eslint-plugin-import eslint-plugin-react eslint-plugin-react-hooks and eslint-plugin-jsx-a11y -D`
+  - 安裝好 eslint 插件 和 配置 .eslintrc.js文件 不需要开启webpack就可以代码修复
+  - 在.eslintrc.js文件配置和可以eslint插件一起使用  在webpack里面loader 内配置 仅仅在是 打包的时候 用
 ```js
 {
     test: /\.jsx?$/,
@@ -336,6 +349,13 @@ window.addEventListener('resize',setRemUnit)
     }
   }
 }
+/*
+class A{
+    static a=1
+}
+let a = new A()
+console.log('index111',a,A.a)
+*/
 {
   loader:'eslint-loader',
   include: join(__dirname, './src')
@@ -381,6 +401,28 @@ const OptimizeCSSAssetsPlugin = require("optimize-css-assets-webpack-plugin");//
     ]
   },
 ```
+### 代码切割
+```js
+ optimization:{
+    splitChunks:{//分隔代码块
+      cacheGroups:{
+        vendor:{//打包第三方
+          chunks:'initial',//指定分隔的类型,默认有3中选项 all async initial
+          name:'vendors',// 给分隔出去的代码块 起一个名字 vendors
+          test:/node_modules/,//如果模块ID匹配这个正则的话,就会添加到vendors代码块中
+          priority:-10,//优先级
+        },
+        commons:{
+          chunks:'initial',
+          name:'commons',
+          minSize:0,//最小提取的字节
+          minChunks:2,// 最少被几个chunk引用需要提取
+          priority:-20
+        }
+      }
+    }
+  },
+```
 ## 配置
 ###  glob 查找目录的所有文件
 - cnpm i -S glob
@@ -395,13 +437,14 @@ console.log(rs) //返回src目录下所有的js和gif文件 不管多少层目�
 ### devtool 打包调试
 - sourcemap 性能最差,效果最好,会生成一个source-map文件 能定位到行和列 
   - 不能缓存source-map文件,每次编译都会生成新的代码块文件,在生成环境下会影响性能
+  - source-map生成配置文件 mappings里面的数据就是一个代码映射   
 - eval 用最好的性能,但是只能映射到编译后的代码 主要是把编译前和后的代码关联起来
-  - 生成代码 每个模块都被eval执行，并且存在@sourceURL,带eval的构建模式能cache SourceMap
+  - 生成代码 每个模块都被eval执行 进行缓存，并且存在 sourceURL 映射到对应的源码路径(dev启动服务),带eval的构建模式能cache SourceMap
   - 1、不需要生成单独的source-map文件
   - 2、eval代码包裹起来代码可以缓存
-- cheap 
+- cheap(廉价的)
   - 不包含列表信息
-  - cheap-source-map 定位到行 但是是编译后的文件(不包含loader等)
+  - cheap-source-map 定位到行 但是是编译后的文件(babel 处理后的，不包含loader等)
 - module
   - 包含loader的source-map(比如jsx to js,babel的source-map,源文件显示需要babel等loader处理,打包后的都是不需要loader处理的),否则无法定义源文件
   - cheap-module-source-map 定位到行 显示的源文件的代码
@@ -531,17 +574,18 @@ new CleanWebpackPlugin({cleanOnceBeforeBuildPatterns: ['**/*', '!static-files*']
     }
   },
 ```
-### 热更新(配置无效)
+### 热更新
 - 配置hot
   - DevServer 默认不会开启模块热替换模式，要开启该模式，只需在启动时带上参数 --hot
-
+  - cnpm i webpack@4.39.1 webpack-cli@3.3.6 webpack-dev-server@3.7.2 mime html-webpack-plugin express socket.io -S
+  - 若配置不上 就删掉第三方库重新单独下载测试
 ```js
 devServer:{
   // 告诉 DevServer 要开启模块热替换模式
   hot: true,      
 }  
 plugins:[
-  new webpack.NamedModulesPlugin(), // 用于启动 HMR 时可以显示模块的相对路径
+  // new webpack.NamedModulesPlugin(), // 用于启动 HMR 时可以显示模块的相对路径
   new webpack.HotModuleReplacementPlugin(), // Hot Module Replacement 的插件
 ]
 
@@ -605,7 +649,8 @@ resolve:{
   extension:['.js','.jsx','.json','.css'],
 //  配置别名 import bootstrap 直接找后面的文件
   alias:{
-    "bootstrap":path.join(__dirname,"node_modules/bootstrap/dist/css/bootstrap.css")
+    "bootstrap":path.join(__dirname,"node_modules/bootstrap/dist/css/bootstrap.css"),
+    'components': path.join(__dirname,'src'),// import rs from 'components/data.js' ==>定位到path.join(__dirname,'src','data.js')
   },
   // 第一个是减少查找路径 增快查找速度 第二个是添加额外额查找路径 只有是引入的时候 不添加路径 直接写包名
   modules:['node_modules','zfmoudle'],
@@ -841,7 +886,9 @@ module.exports={
 ```
 
 ### polyfill
-- babel-polyfill 
+- babel-polyfill
+- Babel默认只转换新的JavaScript语法（syntax），如箭头函数等，而不转换新的API，比如Iterator、Generator、Set、Maps、Proxy、Reflect、Symbol、Promise等全局对象，以及一些定义在全局对象上的方法（比如Object.assign）都不会转码；因此我们需要polyfill 
+- polyfill （它需要在源代码之前运行），我们需要让它成为一个 dependency（上线时的依赖）,而不是一个 devDependency（开发时的依赖）；
 - polyfill-service
   - 自动化的 JavaScript Polyfill 服务
   - Polyfill.io 通过分析请求头信息中的 UserAgent 实现自动加载浏览器所需的 polyfills  
@@ -852,9 +899,13 @@ module.exports={
 ### libraryTarget && library 
 - 当用 Webpack 去构建一个可以被其他模块导入使用的库时需要用到它们
 - output.library 导出库的名称
-- output.libraryExport 配置要导出的模块中哪些子模块需要被导出。 它只有在 output.libraryTarget 被设置成 commonjs 或者 commonjs2 时使用才有意义
+- output.libraryExport 配置要导出的模块中哪些子模块需要被导出。 
+  -  它只有在 output.libraryTarget 被设置成 commonjs 或者 commonjs2 时使用才有意义
+  -  当值为 default 时，针对的`libraryTarget 为commonjs2` 因为 commonjs2 导出的是 default
+  -  当值为 xx  自定义的时候, 针对的`libraryTarget 为commonjs` 因为 commonjs 是导出的 xx 为单个导出的对象
+  -  在浏览器测试他的时候 用umd 进行 不然其他2中浏览器不支持导出方式
 - output.libraryTarget 配置以何种方式导出库,是字符串的枚举类型，支持以下配置
-- libraryTarget	 使用者的引入方式	使用者提供给被使用者的模块的方式
+- libraryTarget	 使用者的引入方式	使用者提供给被使用者的模块的方式 (可以自己自定义)
   - 1、var(默认)  => 只能以script标签的形式引入我们的库	只能以全局变量的形式提供这些被依赖的模块  只要是var 都要用script 标签引入
   - 2、commonjs/commonjs2(node导出模块) 要配合  libraryExport选择使用(默认 `default`,在写好的文件中 我们会通过export default 批量导出,如果当个导出的话 default就换成单个导出的名字)
   - commonjs    => exports 单个导出
@@ -862,6 +913,10 @@ module.exports={
   - 3、umd	    => 可以用script、commonjs、amd引入	按对应的方式引入
   -  注意 umd 会把所有的模式发包 window 是浏览器才有的 global
 ```js
+library:'xxx',// 导出库的名称
+libraryTarget:'var',// 以何种方式导出
+libraryExport:'default'// 导出那种属性
+
 // src/index.js
 // 单个导出用commonjs libraryExport设置为导出的名字
 export function add(a,b){
@@ -1012,6 +1067,7 @@ new webpack.DefinePlugin({
   TEST:JSON.stringify(process.env.NODE_ENV_SS)
 }),
 ```
+- `process.env.NODE_ENV`可以在前端js文件内获取到
 
 ## webpack 源码入口分析
 - npx webpack 执行的时候 他会找node_modules/bin/webacp.cmd
@@ -1063,7 +1119,20 @@ let compiler = webpack(config)
 debugger;
 compiler.run((err,stats)=>{ 
   console.log(err)
-  console.log(stats)
+  /*
+    返回的是主要含有modules、chunks和assets三个属性值的对象。
+    entries 这里放的是入口模块
+    chunks 编译出来了几个代码
+    modules 编译出来的模块
+    assets key 是文件的名称 值是文件内容
+  stats.toJson(内部的) 用来过滤(这是为false)打印的数据 
+  */  
+  console.log(stats.toJson({
+    entries:true,
+    chunks:true,
+    modules:true,
+    assets:true 
+  }))
 })
 ```
 - 通过上面的的debugger 调试 进入到Compiler.js 找到 this.hooks 将下面的代码调试加入 可以打印webpack的整体流程
@@ -1111,7 +1180,7 @@ done 整个编译完成
 // 或者
 // npx webpack --profile --json > stats.json
 ```
-### import 动态引入
+### import 动态引入(异步加载)
 - 打包后的文件名字 会默认加数字
 - 可以通过 webpackChunkname 处理
 - 也可以通过 output 的chunkFilename 配置(注意 filename不能写死 否则不生效)
@@ -1119,11 +1188,21 @@ done 整个编译完成
 import(/* webpackChunkName:'lazy' */'./lazy.js').then(rs=>{
   console.log(rs.default)
 })
+
+// 通过点击按钮 在加载代码
+let button = document.createElement('button');
+button.innerHTML = '异步加载额外的模块'
+button.onclick = function(){
+  import(/* webpackChunkName:'lazy' */'./title.js').then(rs=>{
+    console.log(rs.default)
+  })
+}
+document.body.appendChild(button)
 ```
-### module chunk assert关系
-```js
-待定
-```
+### module chunk assets 关系
+- module 是每个文件打包的对象
+- chunk 是一个入口文件所有的代码  包含多个module
+- assets 将要打包的资源
 
 ### webpack的插件机制
 - webpack实现插件机制的大体方式是
@@ -1150,10 +1229,10 @@ const {
 ```js
 /*
 类型	使用要点
-Basic	不关心监听函数的返回值
+Basic	基本型: 不关心监听函数的返回值
 Bail	保险式: 只要监听函数中有返回值(不为undefined)，则跳过之后的监听函数
 Waterfall	瀑布式: 上一步的返回值交给下一步使用
-Loop	循环类型: 如果该监听函数返回true,则这个监听函数会反复执行，如果返回undefined则退出循环
+Loop	循环类型: 如果该监听函数返回true,则这个监听函数会反复执行(从头开始执行)，如果返回undefined则退出循环
 
 1、所有的构造函数都接收一个可选参数,参数是一个参数名的字符串数组
 2、参数的名字可以任意填写,但参数数组的长度必须要根据实际接收的参数个数一致
@@ -1184,7 +1263,7 @@ Loop	循环类型: 如果该监听函数返回true,则这个监听函数会反�
   - context:true 就是支持上下文 后面的函数就有context对象
   - 他是全局唯一的 在那儿修改 都能获取
 
-<img :src="$withBase('/img/tapable.png')" >
+<!-- <img :src="$withBase('/img/tapable.png') " > -->
 
 ### 1、SyncHook 串行同步执行,不关心返回值
 ```js
@@ -2421,25 +2500,7 @@ require ('-!inline1!inline2!./hello')
   | loader-utils.interpolateName | 使用多个占位符或一个正则表达式转换一个文件名的模块。这个模板和正则表达式被设置为查询参数，在当前loader的上下文中被称为name或者regExp    |   
 
 ### loader实战
-- loader 原理
-  - 每一个loader都是一个函数,loader包含 pitch 和 normal,当配置`use:['style-loader','css-loader']` 我们常说从右往左执行,实际这个指的是 normal loader,loader的执行顺序是: `style-loader.pitch => css-loader.pitch => css-loader.normal(普通) => style-loader.normal`。平常很少用到pitch但实际情况是他先执行，如果他返回一个不为`undefined` 那么会结束后面的要执行的loader,直接进入上一个loader的pitch方法中。
-  - 下面附带 webpack内部 resource和loader 之间的关系,当路径匹配上后(`content = loader(content)`) resource会将自己传入loader内进行处理,后面返回resource,注意传递进去的是 string(可执行的js) 传出来的也是 string 
-    - 下面第二个js 是loader内部解析,先分析 resource 的处理 整体情况后面再分析
-    - pitch 核心处理 `pitchFn.apply(loaderContext,[loaderContext.remindingRequest,loaderContext.previousRequest,loaderContext.data])`
-    - normal 核心处理 `normalFn.apply(loaderContext,[args])`
-    - 上面2个处理 最终都会进入到`if(loaderContext.loaderIndex<0){  return  finallyCallback(null,args) }`,将他们执行后的结果返回出去 这样就将webpack 内部的 resource 进行的处理
-  - 整个loader处理和webpack就关联起来了
-- 解刨 normal 和 pitch
-  - 调用 runLoaders 函数 接收配置参数 和 回调函数,注意`context`是loader内的上下文 可以传递数据`pitch`的第三个参数和this.data 同一个对象(都是上下文),在`pitch`内给第三个参数设置 在其他loader和 normal 都是可以通过`this.data`获取到的
-  -  runLoaders 函数 主要处理了3件事
-    - 1、将参数全部保存到`loaderContext`(也是指向context)对象上 
-    - 2、`defineProperty(loaderContext)` 给上下文 增加属性 `request`(所有请求的loader) `remindingRequest`(剩下的loader) `previousRequest`(之前请求的loader) `currentRequest`(当前的loader)`data`(当前的上下文)
-    - 3、`loaderContext.async`处理异步问题 他async 挂载到上下文
-    - 4、执行`iteratePitchingLoaders` pitch
-    - 剩下的就是 `iteratePitchingLoaders`和`iterateNormalLoaders`之间的一点逻辑判断
-    - pitch loader 函数处理 `let args = pitchFn.apply(loaderContext,[loaderContext.remindingRequest,loaderContext.previousRequest,loaderContext.data])`这个是处理pitch loader 接收的参数 第一个是 剩下的loader(也就是当前loader之后的loader) 第二个是 之前的loader 第三个是 当前的上下文 最后返回的还是一个 字符串 (可执行的js)
-    - normal loader 函数处理 `normalFn.apply(loaderContext,[args])` 他接收的就是上一个传递过来的 resource 是一个字符串 (可执行的js),同样他返回也是这样的 字符串  
-- pitch 作用:让两个loader配合使用(在css-loader和style-loader体现明显)
+
 - 内联loader
   - ! 不要前置loader
   - -! 不要普通loader和前置
@@ -2472,171 +2533,86 @@ require ('-!inline1!inline2!./hello')
     return content
   }
 ```
-- loader 内部处理 简单解析
+
+### pitch
+    - 比如a!b!c!module, 正常调用顺序应该是c、b、a，但是真正调用顺序是 a(pitch)、b(pitch)、c(pitch)、c、b、a,如果其中任何一个loader pitch返回值不为undefined 那么它以及它右边的loader normal 已经执行完毕 值会传给上一个loader normal ,如果值为 undefined 就不影响loader normal
+    - 比如如果b返回了字符串"result b", 接下来只有a会被系统执行，且a的loader收到的参数是result b
+    - pitch与loader本身方法的执行顺序图
+
 ```js
-// loader1
-function loader(inputSource){
-  console.log('loader1',this.data)
-  return inputSource +'//loader1'
-}
+      |- a-loader `pitch`
+        |- b-loader `pitch`
+          |- c-loader `pitch`
+            |- requested module is picked up as a dependency
+          |- c-loader normal execution
+        |- b-loader normal execution
+      |- a-loader normal execution
 
-loader.pitch = function(remindingRequest,previousRequest,data){
-  data.pitch1 = 'pitch1'
-  console.log('pitch11',data)
-  console.log('pitch12',this.data)
-}
+      // 3个loader
+      // loader1 文件
+      function loader1 (source){ //normal
+        console.log('1111')
+        return source
+      }
+      loader1.pitch = ()=>{ //pitch
+        console.log('loader1')
+      }
 
-module.exports = loader
+      module.exports = loader1
 
-// loader2
-function loader(inputSource){
-  let cb = this.async()
-  setTimeout(()=>{
-    console.log('loader2')
-    cb(null,inputSource)
-  },2000)
-}
+      // loader2 文件
+      function loader1 (source){
+        console.log('222')
+        return source
+      }
+      loader1.pitch = ()=>{
+        console.log('loader3')
+      }
 
-loader.pitch = function(remindingRequest,previousRequest,data){
-  console.log('pitch2')
-}
-module.exports = loader
+      module.exports = loader1
 
-// loader3
-function loader(inputSource){
-  console.log('loader3',inputSource)
-  return inputSource
-}
 
-loader.pitch = function(remindingRequest,previousRequest,data){
-  console.log('pitch3')
-  
-}
-// 默认情况下loader得到的内容是字符串 如果想要的得到二进制文件 需要把raw=true
-loader.raw = true
+      // loader3 文件
+      function loader1 (source){
+        console.log('333')
+        return source
+      }
+      loader1.pitch = ()=>{
+        console.log('loader3')
+      }
+      module.exports = loader1
 
-module.exports = loader
-
-// loader  pitch/normal
-let path = require('path')
-let fs = require('fs')
-
-function createLoaderObject(loaderPath){
-  let obj = {data:{}};//data是用来在pitch和normal里面传递数据的
-  obj.request = loaderPath;//loader这个文件绝对值
-  obj.normal = require(loaderPath);//正常的loader函数
-  obj.pitch = obj.normal.pitch;//pitch函数
-  return obj
-}
-
-function defineProperty(loaderContext){
-  // 当index为1的时候
-  Object.defineProperty(loaderContext,'request',{
-    get:function(){// request loader1!loader2!loader3!hello.js
-      return loaderContext.loaders.map(loader=>loader.request).concat(loaderContext.resource).join('!')
-    },
-  })
-  Object.defineProperty(loaderContext,'remindingRequest',{
-    get:function(){// request loader3!hello.js
-      return loaderContext.loaders.slice(loaderContext.loaderIndex+1).map(loader=>loader.request).concat(loaderContext.resource).join('!')
-    },
-  })
-  Object.defineProperty(loaderContext,'previousRequest',{
-    get:function(){// request loader1
-      return loaderContext.loaders.slice(0,loaderContext.loaderIndex).join('!')
-    },
-  })
-  Object.defineProperty(loaderContext,'currentRequest',{
-    get:function(){// request loader2!loader3!hello.js
-      return loaderContext.loaders.slice(loaderContext.loaderIndex).map(loader=>loader.request).concat(loaderContext.resource).join('!')
-    },
-  })
-  Object.defineProperty(loaderContext,'data',{
-    get:function(){
-      return loaderContext.loaders[loaderContext.loaderIndex].data
-    },
-  })
-}
-
-function iterateNormalLoaders(loaderContext,args,finallyCallback){
-  if(loaderContext.loaderIndex<0){
-    return  finallyCallback(null,args)
-  }else{
-    let currentLoaderObject = loaderContext.loaders[loaderContext.loaderIndex];
-    let normalFn = currentLoaderObject.normal
-    args = normalFn.apply(loaderContext,[args]);
-    if(isSync){
-      loaderContext.loaderIndex--
-      iterateNormalLoaders(loaderContext,args,finallyCallback)
+      rules:[
+        {
+          test:/.js$/,
+          use:{
+            loader:[path.resolve('src/loaders/loader1'),
+                   [path.resolve('src/loaders/loader2'),
+                   [path.resolve('src/loaders/loader3')]
+          }
+        }
+      ]
+      // 正常情况下没有pitch 执行顺序应该是 loader3=>loader2=>loader1=>
+      // 加入pitch loader1.pitch => loader2.pitch => loader3.pitch =>loader3=>loader2=>loader1
+      /* 
+        pitch作用 
+        若返回一个 字符串 那么跳过后面的pitch 和跳过当前的loader 进入下一个loader
+        比如 loader2.pitch return一个字符串 loader1.pitch => loader2.pitch =>loader1 (loader3.pitch =>loader3=>loader2 不会执行)
+      */
+    ```
+  - 处理css
+    - css-loader 的作用是处理css中的 @import 和 url 这样的外部资源
+    - style-loader 的作用是把样式插入到 DOM中，方法是在head中插入一个style标签，并把样式写入到这个标签的 innerHTML里
+    - less-loader Compiles Less to CSS
+  - less-loader.js
+  ```js
+    let less = require('less');
+    module.exports = function (source) {
+        let callback = this.async();
+        less.render(source, { filename: this.resource }, (err, output) => {
+            this.callback(err, output.css);
+        });
     }
-  }
-}
-
-function processResource(loaderContext,finallyCallback){
-  // 默认读出来的是buffer
-  let result = loaderContext.readResource(loaderContext.resource)
-  if(!loaderContext.loaders[loaderContext.loaderIndex].normal.raw){
-    result = result.toString('utf8')
-  }
-  iterateNormalLoaders(loaderContext,result,finallyCallback)
-}
-
-function iteratePitchingLoaders(loaderContext,finallyCallback){
-  if(loaderContext.loaderIndex >= loaderContext.loaders.length){
-    loaderContext.loaderIndex--;
-    return processResource(loaderContext,finallyCallback)
-  }
-  let currentLoaderObject = loaderContext.loaders[loaderContext.loaderIndex];
-  let pitchFn = currentLoaderObject.pitch
-  if(!pitchFn){
-    loaderContext.loaderIndex++;
-    return  iteratePitchingLoaders(loaderContext,finallyCallback)
-  }
-  // 剩下的 request 前面的 request 
-  let args = pitchFn.apply(loaderContext,[loaderContext.remindingRequest,loaderContext.previousRequest,loaderContext.data])
-  if(args){
-    loaderContext.loaderIndex--;
-    iterateNormalLoaders(loaderContext,args,finallyCallback)
-  }else{
-    loaderContext.loaderIndex++;
-    return  iteratePitchingLoaders(loaderContext,finallyCallback)
-  }
-}
-
-var isSync = true
-
-function runLoaders(options,finallyCallback){
-  let loaderContext = options.context||{};// loader的上下文环境
-  loaderContext.resource = options.resource;// 要加载的资源 hello.js
-  loaderContext.loaders = options.loaders.map(createLoaderObject);
-  loaderContext.loaderIndex = 0;// loaderIndex是正在执行loader的索引
-  loaderContext.readResource = options.readResource;// fs.readFile
-  defineProperty(loaderContext)
-  
-  function asyncCallback(err,result){
-    isSync = true
-    loaderContext.loaderIndex--;
-    iterateNormalLoaders(loaderContext,result,finallyCallback)
-  }
-  loaderContext.async = function(){
-    isSync = false;
-    return asyncCallback;
-  }
-  iteratePitchingLoaders(loaderContext,finallyCallback)
-}
-
-runLoaders({
-  resource:path.resolve(__dirname,'src','hello.js'),//要加载的资源
-  loaders:[// 我们要用这三个loader去转换hello.js
-    path.resolve('loader','loader1.js'),
-    path.resolve('loader','loader2.js'),
-    path.resolve('loader','loader3.js'),
-  ],
-  context:{ },
-  readResource:fs.readFileSync.bind(fs)
-},function(err,rs){
-  console.log('=>',rs)
-})
 ```
 
 ### loader-utils
@@ -2732,88 +2708,7 @@ function loader(source) {
 }
 module.exports = loader;
 ```
-### pitch
-    - 比如a!b!c!module, 正常调用顺序应该是c、b、a，但是真正调用顺序是 a(pitch)、b(pitch)、c(pitch)、c、b、a,如果其中任何一个loader pitch返回值不为undefined 那么它以及它右边的loader normal 已经执行完毕 值会传给上一个loader normal ,如果值为 undefined 就不影响loader normal
-    - 比如如果b返回了字符串"result b", 接下来只有a会被系统执行，且a的loader收到的参数是result b
-    - pitch与loader本身方法的执行顺序图
-
-```js
-      |- a-loader `pitch`
-        |- b-loader `pitch`
-          |- c-loader `pitch`
-            |- requested module is picked up as a dependency
-          |- c-loader normal execution
-        |- b-loader normal execution
-      |- a-loader normal execution
-
-      // 3个loader
-      // loader1 文件
-      function loader1 (source){ //normal
-        console.log('1111')
-        return source
-      }
-      loader1.pitch = ()=>{ //pitch
-        console.log('loader1')
-      }
-
-      module.exports = loader1
-
-      // loader2 文件
-      function loader1 (source){
-        console.log('222')
-        return source
-      }
-      loader1.pitch = ()=>{
-        console.log('loader3')
-      }
-
-      module.exports = loader1
-
-
-      // loader3 文件
-      function loader1 (source){
-        console.log('333')
-        return source
-      }
-      loader1.pitch = ()=>{
-        console.log('loader3')
-      }
-      module.exports = loader1
-
-      rules:[
-        {
-          test:/.js$/,
-          use:{
-            loader:[path.resolve('src/loaders/loader1'),
-                   [path.resolve('src/loaders/loader2'),
-                   [path.resolve('src/loaders/loader3')]
-          }
-        }
-      ]
-      // 正常情况下没有pitch 执行顺序应该是 loader3=>loader2=>loader1=>
-      // 加入pitch loader1.pitch => loader2.pitch => loader3.pitch =>loader3=>loader2=>loader1
-      /* 
-        pitch作用 
-        若返回一个 字符串 那么跳过后面的pitch 和跳过当前的loader 进入下一个loader
-        比如 loader2.pitch return一个字符串 loader1.pitch => loader2.pitch =>loader1 (loader3.pitch =>loader3=>loader2 不会执行)
-      */
-    ```
-  - 处理css
-    - css-loader 的作用是处理css中的 @import 和 url 这样的外部资源
-    - style-loader 的作用是把样式插入到 DOM中，方法是在head中插入一个style标签，并把样式写入到这个标签的 innerHTML里
-    - less-loader Compiles Less to CSS
-  - less-loader.js
-  ```js
-    let less = require('less');
-    module.exports = function (source) {
-        let callback = this.async();
-        less.render(source, { filename: this.resource }, (err, output) => {
-            this.callback(err, output.css);
-        });
-    }
-```
-
-### style-loader
+### 3、style-loader
   ```js
     let loaderUtils=require("loader-utils");
     function loader(source) {
@@ -2822,11 +2717,15 @@ module.exports = loader;
           style.innerHTML = ${JSON.stringify(source)};
           document.head.appendChild(style);
         `);
+        // JSON.stringify 在处理的时候 会添加\r\n 要将他们删除 否则会报错
+    style = style.replace(/(\\n|\\r)/g,'')
         return script;
     } 
     /*
       pitch 作用是 让两个loader配合使用
-
+      
+      ** 最后 require是在浏览器执行的
+      
       如果不加 !! 会出现死循环
       
       处理 css 的时候  会先执行 style pitch 如果用loader处理(他无法处理js) 在pitch处理的时候他能通过`remindingRequest`获取剩下的loader 这里要在loader加!! 表示 只能当前的loader(或者叫内联loader处理) 如果不他 他还会走到`style-loader`内 会造成无线循环
@@ -2843,7 +2742,7 @@ module.exports = loader;
     module.exports = loader;
   ```
 
-### css-loader
+### 4、css-loader
   - 作用是处理css中的 @import 和 url 这样的外部资源
   - 安装`postcss` 将css 转换成ast语法树
   - postcss 是用来解析css 转换成ast(类似) 
@@ -2946,7 +2845,7 @@ module.exports = loader;
 
     module.exports = loader
   ```
-### exact-loader.js
+### exact-loader
   ```js
     //把CSS文件单独放置到一个文件中去，然后在页面中通过link标签去引入
     let loader = function (source) {
@@ -3004,7 +2903,127 @@ module.exports = loader;
   loader.raw = true;
   module.exports = loader;
   ```
-  ###  测试待写
+### sprite-loader
+- 用法 在图片后面加?sprite 做标识  loader内部 判断有这个 会组合成一张图片 在给他们增加一个`background-position`属性
+```css
+.one{
+  background-image:url(../img/1.jpg?sprite) ;
+  width: 400px;
+  height: 400px;
+}
+
+.two{
+  background-image:url(../img/2.jpg?sprite) ;
+  width: 400px;
+  height: 400px;
+}
+
+.three{
+  background-image:url(../img/3.jpg?sprite) ;
+  width: 400px;
+  height: 400px;
+}
+```
+```js
+  const postcss = require('postcss')
+  const path = require('path')
+  const loaderUtils = require('loader-utils')
+  const SpriteSmith = require('spritesmith')
+  const Tokenizer = require('css-selector-tokenizer')
+  function loader(inputSource){
+      let callback = this.async();
+      let that = this;//this.context 代表被加载资源的上下文目录
+    function createPlugin(postcssOptions){
+      return function(css){
+        css.walkDecls(function(decl){
+          let values = Tokenizer.parseValues(decl.value)
+          values.nodes.forEach(value=>{
+            value.nodes.forEach(item=>{
+              if(item.type == 'url' && item.url.endsWith('?sprite')){
+                // 拼一个路径 找到的是这个图片的绝对路径
+                let url = path.resolve(that.context,item.url)
+                item.url = postcssOptions.spriteFilename;
+                // 案例说我要在当前规则下面添加一条background-position
+                postcssOptions.rules.push({
+                  url,// 原始图片的绝对路径,未来合并雪碧图用
+                  rule:decl.parent // 
+                })
+              }
+            })
+          })
+          decl.value = Tokenizer.stringifyValues(values)
+        })
+        // css 添加数据 先给他们一个占位符 在替换 
+        postcssOptions.rules.map(item=>item.rule).forEach((rule,index)=>{
+          // 注意这个的 index 用法 首次数组为空  加一个数组内容对应的index 就会变化
+          rule.append(
+            postcss.decl({
+              prop:'background-position',
+              value:`_BACKGROUND_POSITION_${index}_`
+            })
+          )
+        })
+      }
+    }
+    const postcssOptions = {spriteFilename:'sprite.jpg',rules:[]}
+    let pipeline = postcss([createPlugin(postcssOptions)]);
+    pipeline.process(inputSource,{from:undefined}).then(rs=>{
+      let cssStr = rs.css
+      let sprites = postcssOptions.rules.map(item=>item.url.slice(0,item.url.lastIndexOf('?')))
+
+      SpriteSmith.run({src:sprites},(err,result)=>{
+        let coordinates = result.coordinates
+        Object.keys(coordinates).forEach((key,index)=>{
+          cssStr = cssStr.replace(`_BACKGROUND_POSITION_${index}_`,`-${coordinates[key].x}px -${coordinates[key].y}px`)
+        })
+        that.emitFile(postcssOptions.spriteFilename,result.image)
+        // 注意 导出的是模块是字符串 要加'' JSON.stringify功能就是加''但是他比直接加'' 要好,他可以出来\n  
+        console.log(cssStr)
+        callback(null,`module.exports = ${JSON.stringify(cssStr)}`);
+      })
+    })
+  }
+  loader.raw = true
+  module.exports = loader
+```
+
+### px2rem-loader
+```js
+  const postcss = require('postcss')
+  const path = require('path')
+  const loaderUtils = require('loader-utils')
+  const SpriteSmith = require('spritesmith')
+  const Tokenizer = require('css-selector-tokenizer')
+  function loader(inputSource){
+      let callback = this.async();
+      let {remUnit=75,remPrecision=8} = loaderUtils.getOptions(this)
+      let that = this;//this.context 代表被加载资源的上下文目录
+    function createPlugin(postcssOptions){
+      return function(css){
+        css.walkDecls(function(decl){
+          let values = Tokenizer.parseValues(decl.value)
+          values.nodes.forEach(value=>{
+            value.nodes.forEach(item=>{
+              if(item.name.endsWith('px')){
+                let px =  parseInt(item.name);
+                let rem = (px/remUnit).toFixed(remPrecision);
+                item.name = rem+'rem';
+              }
+            })
+          })
+          decl.value = Tokenizer.stringifyValues(values)
+        })
+      }
+    }
+    const postcssOptions = {}
+    let pipeline = postcss([createPlugin(postcssOptions)]);
+    pipeline.process(inputSource,{from:undefined}).then(rs=>{
+      let cssStr = rs.css
+      callback(null,`module.exports = ${JSON.stringify(cssStr)}`);
+    })
+  }
+  module.exports = loader
+```
 
 ## plugin解析
 - 插件向第三方开发者提供了 webpack 引擎中完整的能力。使用阶段式的构建回调，开发者可以引入它们自己的行为到 webpack 构建流程中。创建插件比创建 loader 更加高级，因为你将需要理解一些 webpack 底层的内部特性来做相应的钩子
@@ -3014,8 +3033,8 @@ module.exports = loader;
   - webpack内部也是通过大量内部插件实现的
 - 可以加载插件的常用对象
 
-| 对象        | 钩子           | 
-| ------------- |:-------------:| 
+|     对象        | 钩子           | 
+| --------------------------- |:-------------:| 
 | Compiler      | run,compile,compilation,make,emit,done | 
 | Compilation    | buildModule,normalModuleLoader,succeedModule,finishModules,seal,optimize,after-seal      | 
 | Module Factory | beforeResolver,afterResolver,module,parser     | 

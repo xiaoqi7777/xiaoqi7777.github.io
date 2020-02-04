@@ -23,7 +23,7 @@
     git remote add origin 地址
 
     删除本地 提交地址
-    git remote rm origin
+    git branch -D master
     
     删除远程分支
     git push origin --delete '分支名字'
@@ -64,4 +64,41 @@
     加上--allow-unrelated-histories
 
 
+```
+
+## vscode
+- code spell checker
+  - 单词检查
+- code runner
+  - 执行运行脚本
+- eslint
+```js
+module.exports = {
+  "parser": "babel-eslint", // 把源码转成语法树的工具
+  "extends": "airbnb", // 继承airbnb规则
+  env: { //指定运行环境
+    browser: true,
+    node: true
+  },
+  rules: {
+    "linebreak-style": "off",
+    "indent": ["error", 4], //缩进风格
+    "quotes": ["error", "double"], //引号类型 
+    "semi": ["error", "always"], //关闭语句强制分号结尾
+    "no-console": "error", //禁止使用console
+    "arrow-parens": 0 //箭头函数用小括号括起来
+  }
+};
+```
+```js
+  // 重新设定tabsize
+    "editor.tabSize": 2,
+    // #让vue中的js按编辑器自带的ts格式进行格式化 
+    "vetur.format.defaultFormatter.js": "vscode-typescript",
+    // // #每次保存的时候自动格式化 他eslint保存 还有点冲突(格式化代码的时候 会把最后一行空格删除,eslint 需要保存这一行)
+    "editor.formatOnSave": true, 
+    // #每次保存的时候将代码按eslint格式进行修复
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
 ```

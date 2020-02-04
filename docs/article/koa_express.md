@@ -216,6 +216,33 @@ module.exports = {
 ```
 
 ## express
+### ejs用法
+```js
+let ejs = require('ejs')
+let singleTem = `
+hello <%=name%> world <%=age%>;
+`
+let render1 =  ejs.compile(singleTem)
+let rs1 = render1({ name: 'zdpx', age: 9 })
+console.log(rs1)
+
+let objTem = `
+<%if(user){%>
+  hello '<%=user.name%>'
+<%}else{%>
+  hi guest
+<%}%>
+<ul>
+<%for(let i=0;i<total;i++){%>
+  <li><%=i%></li>
+<%}%>
+</ul> 
+`
+let render2 = ejs.compile(objTem)
+let rs2 = render2({user:{name:'sg'},total:'2'})
+console.log(rs2)
+
+```
 ### 上手
 - 可以先打断点简单的看下源码,通过下的测试，打断点进行查看
 - 可以看到常用的 creatApplication application Router Route Layer 这五个类

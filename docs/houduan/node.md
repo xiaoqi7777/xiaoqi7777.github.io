@@ -96,6 +96,9 @@ function copy(src,target){
 
 **6、path.relative 从绝对路径里面找相对路径**
 
+**7、path.posix 为了保证在不同的操作系统下唯一性**
+- `let {join,dirname} = require('path').posix`不同操作系统分割符不一样
+
 **7、path.dirname 找父路径  path.dirname('./src/a.js') =>./src **
 
 ```js
@@ -276,7 +279,7 @@ vm.runInThisContext(fn); //2
 - URI:统一资源标识符
 - URL:统一资源定位符
 - URN:统一资源命名符
-    
+
 **URL的格式**
 ```javascript
     http://user:pass@www.example.jp:80/dir/index.html?uid=1#ch1
@@ -288,6 +291,7 @@ vm.runInThisContext(fn); //2
     uid             查询字符串
     ch1             片段标识符(后端拿不到这个值)    
 ```
+
 ```javascript
   常用状态码:
     1XX(信息状态码 websocket才用)
@@ -439,7 +443,9 @@ app.listen(4000)
 
 **1、let mime = require('mime')**
 ```js
-// 获取文件的后缀
+// 根据文件名的后缀 返回文件的内容类型
+// xx.html => text/html
+// xx.css => text/css 
   mime.getType('引入文件')
 ```
 **2、let fs = require('mz/fs')**
