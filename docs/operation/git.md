@@ -70,13 +70,21 @@
 ```
 ## 三个区域
 - 工作区  是红色(status)
-    -   git add (到暂存区)
+    - git add (到暂存区)
 - 暂存区 是绿色
-    -   git commit (到版本库)
+    - git commit (到版本库)
 - 版本库 
-    -   git log(查看版本号) 
+    - git log(查看版本号) 
 ## git diff 
--   git diff --cached
+- 比较工作区和暂存区(就是git add之后的比较)
+  - git diff --cached
+- 比较工作区和版本库
+  - git diff master(分支)
+## 撤销(git add内容)
+- git reset Head .(将绿色状态变成红色)
+## 从暂存区把内容撤回来
+- git checkout index.html
+
 ## vscode
 - code spell checker
   - 单词检查
