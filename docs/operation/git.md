@@ -7,7 +7,7 @@
       passwd git
 
     查看用户名字/邮箱
-      git config user.name
+      git config --global(可有可无) user.name
       git config user.email
     修改用户名/邮箱
       git config --global user.name "Your_username"
@@ -18,6 +18,9 @@
     创建git仓库
       git init 初始化项目  他会创建一个.git文件 里面放了一堆配置
       git init --bare 不包含工作区域 只是一个仓库 让别人提交代码
+
+    查看状态
+    git status
 
     添加 提交地址
     git remote add origin 地址
@@ -65,7 +68,15 @@
 
 
 ```
-
+## 三个区域
+- 工作区  是红色(status)
+    -   git add (到暂存区)
+- 暂存区 是绿色
+    -   git commit (到版本库)
+- 版本库 
+    -   git log(查看版本号) 
+## git diff 
+-   git diff --cached
 ## vscode
 - code spell checker
   - 单词检查
