@@ -102,6 +102,15 @@
 - 创建分支 git branch dev
 - 查看分支 git branch
 - 切换分支 git checkout dev
+- 创建切换分支 git checkout -b dev
+- 删除分支 git branch -d dev
+- 查看合并图谱 git log --oneline --graph/git log --oneline --graph --all --decorate
+
+## 存储工作区
+- 本地分支没有保存 要调到另一个分支 可以将当前工作区暂停
+- git stash 存储
+- git stash list 查看存储工作区
+- git stash pop 释放本地存储
 
 ## vscode
 - code spell checker
