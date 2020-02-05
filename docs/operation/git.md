@@ -83,7 +83,17 @@
 ## 撤销(git add内容)
 - git reset Head .(将绿色状态变成红色)
 ## 从暂存区把内容撤回来
-- git checkout index.html
+- git checkout index.html/.(绿色部分覆盖红色)
+## git rm 
+- 删除工作区(或者暂存区)的内容 先要在本地把文件删除 在执行 git rm
+- git rm index.html 
+## 删除缓存区的内容 保存工作区的内容
+- git rm --cached index.html
+## 从工作区域直接到版本区域
+- git commit -a -m 'xxx'
+## 恢复版本
+- git reset --hard xxxxxxxxx
+- git reflog 查看历史版本
 
 ## vscode
 - code spell checker
