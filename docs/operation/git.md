@@ -75,26 +75,33 @@
     - git commit (到版本库)
 - 版本库 
     - git log(查看版本号) 
-## git diff 
+### git diff 
 - 比较工作区和暂存区(就是git add之后的比较)
   - git diff --cached
 - 比较工作区和版本库
   - git diff master(分支)
-## 撤销(git add内容)
+### 撤销(git add内容)
 - git reset Head .(将绿色状态变成红色)
-## 从暂存区把内容撤回来
+### 从暂存区把内容撤回来
 - git checkout index.html/.(绿色部分覆盖红色)
-## git rm 
+### git rm 
 - 删除工作区(或者暂存区)的内容 先要在本地把文件删除 在执行 git rm
 - git rm index.html 
-## 删除缓存区的内容 保存工作区的内容
+### 删除缓存区的内容 保存工作区的内容
 - git rm --cached index.html
-## 从工作区域直接到版本区域
+### 从工作区域直接到版本区域
 - git commit -a -m 'xxx'
-## 恢复版本
-- git reset --hard xxxxxxxxx
-- git reflog 查看历史版本
+### 恢复版本
+- git log 查看历史版本
+- git reset --hard 历史版本号
+- git reflog 历史版本号
+- history 查看输入的历史命令
+- git reset --hard^ 往上回滚一级  
 
+## 分支
+- 创建分支 git branch dev
+- 查看分支 git branch
+- 切换分支 git checkout dev
 
 ## vscode
 - code spell checker
