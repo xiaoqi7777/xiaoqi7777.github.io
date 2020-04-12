@@ -498,3 +498,274 @@ tenant2.rent(agent)
 
 landLord.lend(agent,40,600)
 ```
+##  webpack 执行过程 
+```js
+// 配置 2、插件 3、run 4、make 5、seal 6、emitAssets
+// 1、执行npx webpack 他会找node_modules .bin/webpack.cmd => webpack/bin/webpack.js => webpack-cli/bin/cli 入口文件就这 获取webpack配置 webpack(options) 得到compiler实例 通过compiler.run 开始编译
+
+// 2、解析配置 解析shell 和webpack 配置选项 
+
+// 3、初始化 注册nodeEnvironmentPlugin插件，执行所有webpack 配置插件, 使用webpackOptionApply初始化基础插件
+
+// 4、run `compiler.run` 会执行内部的`this.compile`他是真正开始编译  他内部会初始化`Compilation`,`Compilation`负责了整个编译过程,内部的`this.compiler`执行conpiler对象，创建entries入口、chunks代码块、modules所有模型、assets所有的资源、模板(mainTemplate,chunkTemplate,hotUpdateChunkTempalte,moduelTemplate,runtimeTemplate)
+
+// 5、make 事件触发 singleEntryPlugin 插件 执行compilation.addEntry,根据入口文件通过工厂方式创建代码块模块保存到`entries`内,触发module.build方法对源码进行loader处理 在进行ast语法解析，会将`require`替换成`__webpack_require__`,同时遇到`require`会创建 dependency 添加到依赖数组。module处理完成后 处理依赖模块
+
+// 6、seal 对每个每个chunk 和 module进行处理,创建代码块资源，通过模板把chunk生成__webpack_require__()的格式  mainTemplate处理入口的module chunkTemplate处理异步加载 生成资源放在compilation.assets中
+
+// 7、emitAssets 把assets输出到output的path中
+```
+
+## 主要的生命周期 插件
+```js
+// 入口 webpackOptionApply entryOption
+// run beforeRun beforeCompile compile thisCompilation compilation
+// make buildModule successModule finishModules
+// seal seal optimize reviveModule reviveChunk beforeChunk beforeHash afterHash afterChunk beforeModuleAssets chunkAssets
+// emit emit afterEmit done afterSeal 
+```
+
+## jsonp
+```js
+// function jsonp({url,params,cb}){
+//     return new Promise((resolve,reject)=>{
+//         window[cb] = function(data){
+//             resolve(data)
+//         }
+//         params = {...params,cb}
+//         let arr = []
+//         for(let i in params){
+//             arr.push(`${i}=${params[i]}`)
+//         }
+//         params = arr.join('&')
+//         let dom = document.createElement('script')
+//         dom.src = `${url}?${params}`
+//         document.body.appendChild(dom)
+//     })
+// }
+// jsonp({
+//     url:'http://localhost:4000/123',
+//     params:{age:1},
+//     cb:'cb'
+// }).then(data=>{
+//     console.log(data)
+// })
+
+// let express = require('express')
+// let app= express()
+// app.get('/123',(req,res)=>{
+//     let {cb} = req.query
+//     console.log(cb)
+//     res.end(`(${cb})('123')`)
+// })
+// app.listen('4000',function(){
+//     console.log('start')
+// })
+```
+
+## ajax
+```js
+// let xhr = new XMLHttpRequest()
+// xhr.open('get','http://localhost:4000/123',true)
+// xhr.onreadystatechange = function(){
+//     if(xhr.readyState == 4&&xhr.status==200){
+//         console.log(xhr.responseText)
+//     }
+// }
+// xhr.send()
+```
+
+## 懒加载
+```js
+// 分2步骤 分割代码,jsonp加载数据
+// 分割代码，在ast解析的时候  遇到Import('xx')语法 会把他解析成__webpack_require__.e('chunkId').then(__webpack_require__.t.bind(module,dependencyChunkId,7)).then(data=>data.default)
+// 其中 dependencyChunkId 对应分隔文件的 对象的key值
+// jsonp 加载数据 
+// __webpack_require__.e 方法就是实现了jsonp加载数据,创建script标签 加载数据分隔数据的js文件 获取数据,他对象数据添加到modules对象上,通过__webpack_require__.t 去解析数据到页面中
+```
+
+## hot 更新
+```js
+// server 端
+// 创建一个sever&&io,io用来监控客户端连接,将连接的所有client存放起来,同时监控hooks.done钩子,每次编译完成的时候,循环所有的client 并且告诉他们 当前的编译的hash值和一个ok,内部要修改把compiler的输出文件系统改成了 MemoryFileSystem(内存)
+// client 端
+// module.hot.accept('moduleId',fn) 缓存数据
+// 创建一个发布订阅 client 监控到 server发送过来的hash保存,当socket接收到ok事件事件,会发送`webpackHotUpdate`事件,第一次的时候 会保存当前的hash值,第二次的时候才会走hot的逻辑 
+//  1、用更新前的上一次hash(hotCurrentHash)+'.hot-update.json'发送get请求,询问服务器到底这一次编译相对上一次编译改变了哪些chunk,哪些模块,返回的 h是当前的hot hash值 c是当前变化的chunkId(c是一个对象,key是 chunkId,value是true)
+//  2、遍历c对象,jsonp请求变化的数据,url是 chunkId+用更新前的上一次hash(hotCurrentHash)+'.hot.update.js',返回的是 webpackHotUpdate('chunkId',{moduleId:value})
+//  3、webpackHotUpdate 作用 遍历jsonp过来的的数据 1、通过__webpack_require__ 加载有变化的module 2、通过moduleId 获取到parentModule 在里面取到hot里之前缓存的函数执行，加载最新的数据 
+```
+
+## loader
+```js
+// 1、给 loaderContext 上下文定义4个变量,request当前所有的loader,remindingRequest剩下的loader,previousRequest之前的loader,data用来共享数据
+// 2、异步处理 isSync 默认是true 当执行async 的时候 会改变 isSync会变成false, 异步执行返回函数的时候 会将isSync变成true
+// 3、先处理 iteratePitchingLoaders 当其中一个pitch函数没有返回值的时候 直接执行下一个 若有返回值的时候 执行他并且传入 remindingRequest,previousRequest,data 为参数
+// 4、pitch执行完成后处理 normal.raw 当为true的时候 就变成二进制,否则不处理
+// 5、处理 iterateNormalLoaders 一次执行 当执行完最后一个就 退出去 执行回调函数
+```
+
+## express
+```js
+// 基本流程 get等 use listen  
+// 1、首先是路由 每一层router 都用Layer创建，第一个参数是路径,第二个参数是处理函数 router.dispatch(每个router 存放着当前路由的所有处理) 将他们存放起来
+// 2、每一层的router 每一次实例的router(layer.router)存放自己  用来去获取当前一层的处理函数和是否是use(use 这一层的router是undefined) 遍历所有的请求methods 只要是某一个请求方式 第一个是路径参数  后面的都是处理函数   获取他所有的处理函数 遍历每一个  都创建一个layer实例 第一个参数是 路径  第二个参数是遍历的单个函数 然后push到当前的stack中。当前类有一个dispatch方法 就是遍历执行所有的 stack 保存的函数
+// 3、listen 在执行  创建 Http.createServer的时候  开始遍历(handle) 执行第一个router 里的所有stack存储的函数,执行完成后 调用next 在取第二个router 就这样依次执行
+// 4、use 和 路由 其实差不多 区别就是 每一层实例的router保存的值不一样 做区别,use是undefined 路由则是每一层的处理函数 use和路由一样 同样是用 Layer创建的 当没有二级中间件的时候 path(路径)就是/,有二级中间件的时候 path就是第一个参数,创建好之后 同样放入到当前实例的stack中,在遍历的时候 就通过layer.router下面是否有值判断是中间件还是路由
+```
+
+### 子路由系統
+```js
+// express.Router() 内部会返回一个router实例 他和express()返回的是一样的 前者是通过函数返回  后者是通过 原型链 构造，Object.setPrototypeOf(fn,{})主要是通过这个api,将对象挂载到函数的原型链上
+// 返回的实例 同时具备use get等方法 二级路由 就是通过app.use('/xxx',子路由实例)
+/**
+ * A 函数new 和 直接执行 原型链都一样
+ * function A(){
+ *  function b(){
+ *  }
+ *  Object.setPrototypeOf(b,proto)
+ *  return b 
+ * }
+ * let proto = Object.create(null)
+ * proto.a= ()=>{}
+*/
+``` 
+
+### 路径参数处理
+```js
+// 1、他会通过下面的库 在匹配路径的时候 他会提取:后面的key值 在匹配传递过来的路径 进行一一对应 挂载到params对象上
+// 2、匹配到路径 处理函数的时候  会拦截处理 遍历是否有 路径参数 对应的函数 会一个一个的遍历执行 同时他也是通过 中间件的形式一个个执行 这个时候 我们可以在req对象上挂载东西
+```
+
+### path-to-RegExp
+```js
+/*
+  path-to-regexp 这个库是通过路径 来提取正则
+  let pathToRegexp = require('path-to-regexp')
+  let path = '/user/:uid/:name';
+  let keys = []
+
+  function pathToRegexp(path, keys) {
+    return path.replace(/\:([^\/]+)/g, ($1, $2, $3) => {
+      console.log('===>',$1,$2,$3)
+      keys.push({
+        name: $2,
+        optional:$3,// 偏移量
+        replace: false
+      })
+      return '([^\/]+)'
+    })
+  }
+
+  let rs = pathToRegexp(path, keys)
+  let str = '/user/123/wew'
+  let a = rs.exec(str)
+  console.log(keys,a)
+*/
+```
+### 模板引擎
+```js
+// app.set('view engine',path.resolve(__dirname, 'views')) 用来设置 模板文件的位子
+// app.set('view engine', 'html') 这个是用来设置模板文件的后缀格式
+// app.engine('html', ejs) 这个 设置html 结尾的 就用ejs 模板进行渲染 ejs是一个函数
+```
+
+### 中间件
+```js
+// 中间件 格式 use 传入一个函数 参数分别是req,res,next
+/*
+  app.use(function(req, res, next) {
+    let { pathname } = url.parse(req.url)
+    req.path = pathname
+    next()
+  })
+*/
+// static中间件 静态目录
+/*
+function static(){
+  function(req, res, next) {
+    let staticPath = path.join(p, req.url)
+    let exists = fs.existsSync(staticPath)
+    if (exists) {
+      let html = fs.readFile(staticPath, (err, item) => {
+        res.setHeader('Content-Type', 'text/html')
+        // res.setHeader('Content-type', 'image/gif')
+        res.end(item)
+      })
+    } else {
+      next()
+    }
+  }
+}
+*/
+
+// bodyParser 请求的参数解析
+/*
+function bodyParser() {
+  return function(req, res, next) {
+    let rs = []
+    req.on('data', function(data) {
+      rs += data
+    })
+    req.on('end', function(data) {
+      try {
+        req.body = JSON.parse(rs)
+      } catch (e) {
+        req.body = require('querystring').parse(rs)
+      }
+      next()
+    })
+  }
+};
+*/
+```
+
+### ejs
+```js
+// ejs 单个渲染原理
+// let str = `hello <%=name%> world <%=age%>`;
+// let options = { name: 'zdpx', age: 9 }
+
+// function render(str, options) {
+//   return str.replace(/<%=(\w+)%>?/g, ($0, $1, $2, $3) => {
+//     return options[$1]
+//   })
+// }
+
+// let rs = render(str, options)
+// console.log(rs)
+
+// ejs if渲染原理
+// let options = { user: { name: 'zdpx', age: 9 }, total: 5 }
+// let str = `
+// <%if(user){%>
+//   hello '<%=user.name%>'
+// <%}else{%>
+//   hi guest
+// <%}%>
+// <ul>
+// <%for(let i=0;i<total;i++){%>
+//   <li><%=i%></li>
+// <%}%>
+// </ul>
+// `
+
+// function render(str, options) {
+//   let head = "let tpl = ``;\n with(obj){ \n tpl+=` "
+//   str = str.replace(/<%=([\s\S]+?)%>/g, function() {
+//     return "${" + arguments[1] + "}"
+//   })
+//   str = str.replace(/<%([\s\S]+?)%>/g, function() {
+//     return "`;\n" + arguments[1] + "\n;tpl+=`";
+//   })
+//   let tail = "`} \n return tpl;"
+//   let html = head + str + tail;
+//   console.log('html=>', html)
+//   let fn = new Function('obj', html)
+//   return fn(options)
+// }
+
+// let rs = render(str, options)
+// console.log(rs)
+```
+

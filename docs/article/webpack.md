@@ -167,6 +167,7 @@ let MiniCssExtractPlugin =  require('mini-css-extract-plugin')
   - 计算 font-size
   - 这个逻辑代码 尽量放到head 标签中 在页面绘制前加载
   - remUnit 配置 代表页面 1rem 是多少 物理像素  通常将页面划分10个rem 所以这里一般是页面的宽度的十分之一
+  - dpr 指物理像素(手机像素)比逻辑像素(css像素)
 ```js
 {
   test:/\.css/,

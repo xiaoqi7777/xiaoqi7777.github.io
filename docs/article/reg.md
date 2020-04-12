@@ -203,4 +203,9 @@ let str = 'ad123asd'
 let rs = str.match(/(?:\d)/)
 console.log(rs) // 结果没有分组的内容 数组长度是1
 ```
- 
+
+## ?=
+- 前瞻 exp1(?=exp2) 查找exp2前面的exp1
+- 后顾 (?<=exp2)exp1 查找exp2前面的exp1(js不支持)
+- 负前瞻 exp1(?exp2) 查找后面不是exp2的exp1
+- 负后瞻 (?<!exp2)exp1 查找前面不是exp2的exp1(js不支持)

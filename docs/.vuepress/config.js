@@ -50,9 +50,20 @@ module.exports = {
           "koa_express",
           "useLibrary",
           "reg",
-          "deepWebpack"
+          "deepWebpack",
+          "ts"
         ]
-      }],
+      },{
+        title:'react',
+        collapsable:false,
+        children:[
+          "react",
+          "redux",
+          "reactRouter",
+          "dva"
+        ]
+      }
+    ],
       "/front/": [{
         title: 'front',
         collapsable: false,
