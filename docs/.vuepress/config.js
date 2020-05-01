@@ -60,7 +60,15 @@ module.exports = {
           "react",
           "redux",
           "reactRouter",
-          "dva"
+          "dva",
+          "hook",
+          "reactSource"
+        ]
+      },{
+        title:'vue',
+        collapsable:false,
+        children:[
+          "vueSource",
         ]
       }
     ],

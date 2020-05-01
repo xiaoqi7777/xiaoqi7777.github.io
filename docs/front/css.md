@@ -1012,6 +1012,13 @@ body {
   color: $primary-color;
 }
 ```
+### !default
+- 如果不加!default $color不能被修改 ,添加够引入scss文件可以修改他的值
+- 注意：需要将自定义的值先于 @import，否则也不生效。
+```scss
+/* 用法 */
+$color: red!default;
+```
 ### Mixin
 ```css  
 /* layout.scss */
@@ -1161,3 +1168,28 @@ hr {
 ## 图片预加载 onload跟complete 的区别
 - onload表示加载好，没有加载好不会执行onloa事件
 - complete，无论src是否有值，成功与否，只要获取到image，就可以执行
+
+## css技巧汇总
+- hover时候加边边框效果 会出现原来内容移动情况 可以在原来的内容上在一个 透明的边框 占位子
+- 如果用 box-sizing 没有用,因为width 不变 当border增加的时候 内容位子会变化
+```css
+<body>
+  <style>
+      ul,li{
+        list-style: none;
+      }
+      li{
+        height: 20px;
+        border-left: 2px solid transparent;
+      }
+      li:hover{
+        border-left: 2px solid red;
+      }
+  </style>
+  <ul>
+    <li>1</li>
+    <li>2</li>
+    <li>3</li>
+  </ul>
+</body>
+```

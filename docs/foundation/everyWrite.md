@@ -58,7 +58,91 @@ function fn(arr) {
 }
 console.log(fn([5, 2, 6, 3, 2, 6, 1]))
 ```
+## class extends
+```js
+class Father{
+  static staticFatherName = 'FatherName'
+  static staticGetFatherName = function (){
+    console.log(Father.staticFatherName)
+  }
+  constructor(public name){
+    // 他是放在实例上的
+    this.name = '1111111111'
+  }
+  getName(){
+    // 他是放在原型上的
+    console.log(this.name)
+  }
+}
 
+class Child extends Father{
+  static staticChildName = 'ChildName'
+  static staticGetChildName = function (){
+    console.log(Child.staticChildName)
+  }
+  constructor(public name,public age){
+    super(name)
+    this.age = age
+    this.name = 'name111111111'
+  }
+  getAge(){
+    console.log(this.age)
+  }
+}
+let child = new Child('zhefeng',10)
+child.getName()
+child.getAge()
+Child.staticGetChildName()
+Child.staticGetFatherName()
+
+
+// es5
+function _extends(Child,Father){
+  Child.__proto__ = Father;//继承静态属性的方法
+  function Temp(){
+    // constructor 指向子类的构造函数
+    // this.constructor = Child
+  }
+  Temp.prototype = Father.prototype;
+  Temp.prototype.constructor = Child;
+  Child.prototype = new Temp()
+}
+
+var Father = (function(){
+  function Father(name){
+    this.name = name
+  }
+  Father.prototype.getName = function() {
+    console.log(this.name)
+  }
+  Father.staticFatherName = 'FatherName'
+  Father.staticGetFatherName = function() {
+    console.log(Father.staticFatherName)
+  }
+  return Father
+})()
+
+var Child = (function (_super){
+  _extends(Child,_super);
+  function Child(name,age){
+    _super.call(this,name)
+  }
+  Child.prototype.getName = function () {
+    console.log(this.name)
+  }
+  Child.staticChildName = 'ChildName';
+  Child.staticGetChildName = function (){
+    console.log(Child.staticChildName)
+  }
+  return Child
+})(Father)
+let child = new Child('zhufeng',10)
+child.getName();
+// child.getAge();
+Child.staticGetChildName();
+Child.staticGetFatherName();
+
+```
 ## 深拷贝 
 ```js
 function clone(obj) {
@@ -75,7 +159,7 @@ function clone(obj) {
 ## call
 ```js
 Function.prototype.mycall = function(context, ...args) {
-    context = Object(context) ? context : window
+    context = Object(context) ? Object(context) : window
     context.fn = this
 
     let rs = eval('context.fn(' + args + ')')
@@ -92,7 +176,7 @@ fn.mycall({}, 1, 2)
 ## apply
 ```js
 Function.prototype.myapply = function(context, args) {
-    context = Object(context) ? context : window
+    context = Object(context) ? Object(context) : window
     context.fn = this
 
     let rs = eval('context.fn(' + args + ')')
@@ -108,7 +192,7 @@ fn.myapply({}, [1, 2, 3])
 ## mybind
 ```js
 Function.prototype.mybind = function(context, ...args) {
-    context = Object(context) ? context : window
+    context = Object(context) ? Object(context) : window
     let bindArgs = args
     let that = this
 
